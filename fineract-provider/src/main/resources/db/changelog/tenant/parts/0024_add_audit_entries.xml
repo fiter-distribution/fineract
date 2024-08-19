@@ -28,9 +28,9 @@
             <sqlCheck expectedResult="0">select count(*) from m_client</sqlCheck>
         </preConditions>
         <addNotNullConstraint tableName="m_client" columnName="created_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_client" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_client" columnName="last_modified_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_client" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_client" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_client" columnName="last_modified_on_utc" columnDataType="DATETIME"/>-->
+<!--        <addNotNullConstraint tableName="m_client" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
     <changeSet id="client-4" author="fineract" context="postgresql">
         <preConditions onFail="MARK_RAN">
@@ -47,9 +47,9 @@
             <sqlCheck expectedResult="0">select count(*) from m_loan</sqlCheck>
         </preConditions>
         <addNotNullConstraint tableName="m_loan" columnName="created_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_loan" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_loan" columnName="last_modified_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_loan" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_loan" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_loan" columnName="last_modified_on_utc" columnDataType="DATETIME"/>-->
+<!--        <addNotNullConstraint tableName="m_loan" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
     <changeSet id="loan-7" author="fineract" context="postgresql">
         <preConditions onFail="MARK_RAN">
@@ -66,9 +66,9 @@
             <sqlCheck expectedResult="0">select count(*) from m_loan_transaction</sqlCheck>
         </preConditions>
         <addNotNullConstraint tableName="m_loan_transaction" columnName="created_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_loan_transaction" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_loan_transaction" columnName="last_modified_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_loan_transaction" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_loan_transaction" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_loan_transaction" columnName="last_modified_on_utc" columnDataType="DATETIME"/>-->
+<!--        <addNotNullConstraint tableName="m_loan_transaction" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
     <changeSet id="loan-transaction-13" author="fineract" context="postgresql">
         <preConditions onFail="MARK_RAN">
@@ -124,9 +124,9 @@
             <sqlCheck expectedResult="0">select count(*) from m_client_transaction</sqlCheck>
         </preConditions>
         <addNotNullConstraint tableName="m_client_transaction" columnName="created_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_client_transaction" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_client_transaction" columnName="last_modified_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_client_transaction" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_client_transaction" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_client_transaction" columnName="last_modified_on_utc" columnDataType="DATETIME"/>-->
+<!--        <addNotNullConstraint tableName="m_client_transaction" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
     <changeSet id="client-transaction-5" author="fineract" context="postgresql">
         <preConditions onFail="MARK_RAN">
@@ -172,9 +172,9 @@
             <sqlCheck expectedResult="0">select count(*) from m_floating_rates</sqlCheck>
         </preConditions>
         <addNotNullConstraint tableName="m_floating_rates" columnName="created_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_floating_rates" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_floating_rates" columnName="last_modified_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_floating_rates" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_floating_rates" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_floating_rates" columnName="last_modified_on_utc" columnDataType="DATETIME"/>-->
+<!--        <addNotNullConstraint tableName="m_floating_rates" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
     <changeSet id="floating-rate-4" author="fineract" context="postgresql">
         <preConditions onFail="MARK_RAN">
@@ -221,9 +221,9 @@
             <sqlCheck expectedResult="0">select count(*) from m_floating_rates_periods</sqlCheck>
         </preConditions>
         <addNotNullConstraint tableName="m_floating_rates_periods" columnName="created_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_floating_rates_periods" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_floating_rates_periods" columnName="last_modified_on_utc" columnDataType="DATETIME"/>
-        <addNotNullConstraint tableName="m_floating_rates_periods" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_floating_rates_periods" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_floating_rates_periods" columnName="last_modified_on_utc" columnDataType="DATETIME"/>-->
+<!--        <addNotNullConstraint tableName="m_floating_rates_periods" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
     <changeSet id="floating-rate-period-4" author="fineract" context="postgresql">
         <preConditions onFail="MARK_RAN">

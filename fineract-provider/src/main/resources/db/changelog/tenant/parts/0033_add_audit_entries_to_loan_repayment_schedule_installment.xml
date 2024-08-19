@@ -71,8 +71,8 @@
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">select count(*) from m_loan_repayment_schedule where created_by is null or last_modified_by is null</sqlCheck>
         </preConditions>
-        <addNotNullConstraint tableName="m_loan_repayment_schedule" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_loan_repayment_schedule" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_loan_repayment_schedule" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_loan_repayment_schedule" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
     <changeSet author="fineract" id="loan_repayment_schedule_history-1" context="mysql">
         <addColumn tableName="m_loan_repayment_schedule_history">

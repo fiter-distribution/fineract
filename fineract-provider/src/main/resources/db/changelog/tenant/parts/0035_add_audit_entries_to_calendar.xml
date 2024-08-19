@@ -71,7 +71,7 @@
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">select count(*) from m_calendar where created_by is null or last_modified_by is null</sqlCheck>
         </preConditions>
-        <addNotNullConstraint tableName="m_calendar" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_calendar" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_calendar" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_calendar" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
 </databaseChangeLog>

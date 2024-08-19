@@ -71,7 +71,7 @@
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">select count(*) from m_note where created_by is null or last_modified_by is null</sqlCheck>
         </preConditions>
-        <addNotNullConstraint tableName="m_note" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_note" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_note" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_note" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
 </databaseChangeLog>

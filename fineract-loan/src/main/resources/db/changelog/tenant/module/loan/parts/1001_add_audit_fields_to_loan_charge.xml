@@ -71,7 +71,7 @@
         <preConditions onFail="MARK_RAN">
             <sqlCheck expectedResult="0">select count(*) from m_loan_charge</sqlCheck>
         </preConditions>
-        <addNotNullConstraint tableName="m_loan_charge" columnName="created_by" columnDataType="BIGINT"/>
-        <addNotNullConstraint tableName="m_loan_charge" columnName="last_modified_by" columnDataType="BIGINT"/>
+<!--        <addNotNullConstraint tableName="m_loan_charge" columnName="created_by" columnDataType="BIGINT"/>-->
+<!--        <addNotNullConstraint tableName="m_loan_charge" columnName="last_modified_by" columnDataType="BIGINT"/>-->
     </changeSet>
 </databaseChangeLog>
