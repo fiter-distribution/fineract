@@ -1751,7 +1751,30 @@ public class LoanProductsRequestFactory {
                 .buyDownFeeCalculationType(PostLoanProductsRequest.BuyDownFeeCalculationTypeEnum.FLAT)//
                 .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.INTEREST)//
                 .enableBuyDownFee(true)//
+                .merchantBuyDownFee(true)//
                 .buyDownExpenseAccountId(accountTypeResolver.resolve(DefaultAccountType.BUY_DOWN_EXPENSE))//
                 .incomeFromBuyDownAccountId(accountTypeResolver.resolve(DefaultAccountType.INCOME_FROM_BUY_DOWN));//
+    }
+
+    public PostLoanProductsRequest defaultLoanProductsRequestLP2ChargeOffReasonToExpenseAccountMappingsWithBuyDownFee() {
+
+        Long chargeOffReasonId = codeHelper.retrieveCodeByName(CHARGE_OFF_REASONS).getId();
+
+        List<PostChargeOffReasonToExpenseAccountMappings> chargeOffReasonToExpenseAccountMappings = new ArrayList<>();
+        PostChargeOffReasonToExpenseAccountMappings chargeOffFraudReason = new PostChargeOffReasonToExpenseAccountMappings();
+        PostChargeOffReasonToExpenseAccountMappings chargeOffDelinquentReason = new PostChargeOffReasonToExpenseAccountMappings();
+        PostChargeOffReasonToExpenseAccountMappings chargeOffOtherReason = new PostChargeOffReasonToExpenseAccountMappings();
+        chargeOffFraudReason.chargeOffReasonCodeValueId(codeValueResolver.resolve(chargeOffReasonId, DefaultCodeValue.FRAUD));
+        chargeOffFraudReason.expenseAccountId(accountTypeResolver.resolve(DefaultAccountType.CREDIT_LOSS_BAD_DEBT_FRAUD));
+        chargeOffDelinquentReason.chargeOffReasonCodeValueId(codeValueResolver.resolve(chargeOffReasonId, DefaultCodeValue.DELINQUENT));
+        chargeOffDelinquentReason.expenseAccountId(accountTypeResolver.resolve(DefaultAccountType.CREDIT_LOSS_BAD_DEBT));
+        chargeOffOtherReason.chargeOffReasonCodeValueId(codeValueResolver.resolve(chargeOffReasonId, DefaultCodeValue.OTHER));
+        chargeOffOtherReason.expenseAccountId(accountTypeResolver.resolve(DefaultAccountType.CREDIT_LOSS_BAD_DEBT));
+        chargeOffReasonToExpenseAccountMappings.add(chargeOffFraudReason);
+        chargeOffReasonToExpenseAccountMappings.add(chargeOffDelinquentReason);
+        chargeOffReasonToExpenseAccountMappings.add(chargeOffOtherReason);
+
+        return defaultLoanProductsRequestLP2BuyDownFees()//
+                .chargeOffReasonToExpenseAccountMappings(chargeOffReasonToExpenseAccountMappings);//
     }
 }

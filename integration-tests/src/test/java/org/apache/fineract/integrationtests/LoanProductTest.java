@@ -156,13 +156,12 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                     loanProductsProductIdResponse.getCapitalizedIncomeType().getCode());
 
             loanProductHelper.updateLoanProductById(loanProductsResponse.getResourceId(),
-                    new PutLoanProductsProductIdRequest().enableIncomeCapitalization(false)
+                    new PutLoanProductsProductIdRequest()
                             .incomeFromCapitalizationAccountId(interestIncomeAccount.getAccountID().longValue())
                             .capitalizedIncomeType(PutLoanProductsProductIdRequest.CapitalizedIncomeTypeEnum.INTEREST));
-
-            final GetLoanProductsProductIdResponse updatedLoanProductsProductIdResponse = loanProductHelper
+            GetLoanProductsProductIdResponse updatedLoanProductsProductIdResponse = loanProductHelper
                     .retrieveLoanProductById(loanProductsResponse.getResourceId());
-            Assertions.assertEquals(Boolean.FALSE, updatedLoanProductsProductIdResponse.getEnableIncomeCapitalization());
+            Assertions.assertEquals(Boolean.TRUE, updatedLoanProductsProductIdResponse.getEnableIncomeCapitalization());
             Assertions.assertNotNull(updatedLoanProductsProductIdResponse.getCapitalizedIncomeCalculationType());
             Assertions.assertEquals(LoanCapitalizedIncomeCalculationType.FLAT.getCode(),
                     updatedLoanProductsProductIdResponse.getCapitalizedIncomeCalculationType().getCode());
@@ -172,6 +171,14 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
             Assertions.assertNotNull(updatedLoanProductsProductIdResponse.getAccountingMappings());
             Assertions.assertEquals(interestIncomeAccount.getAccountID().longValue(),
                     updatedLoanProductsProductIdResponse.getAccountingMappings().getIncomeFromCapitalizationAccount().getId());
+
+            loanProductHelper.updateLoanProductById(loanProductsResponse.getResourceId(),
+                    new PutLoanProductsProductIdRequest().enableIncomeCapitalization(false));
+
+            updatedLoanProductsProductIdResponse = loanProductHelper.retrieveLoanProductById(loanProductsResponse.getResourceId());
+            Assertions.assertEquals(Boolean.FALSE, updatedLoanProductsProductIdResponse.getEnableIncomeCapitalization());
+            Assertions.assertNotNull(updatedLoanProductsProductIdResponse.getAccountingMappings());
+            Assertions.assertNull(updatedLoanProductsProductIdResponse.getAccountingMappings().getIncomeFromCapitalizationAccount());
             Assertions.assertNotNull(updatedLoanProductsProductIdResponse.getCapitalizedIncomeType());
             Assertions.assertEquals(LoanCapitalizedIncomeType.INTEREST.getCode(),
                     updatedLoanProductsProductIdResponse.getCapitalizedIncomeType().getCode());
@@ -252,7 +259,7 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                     .enableBuyDownFee(true).buyDownFeeCalculationType(PostLoanProductsRequest.BuyDownFeeCalculationTypeEnum.FLAT)
                     .buyDownFeeStrategy(PostLoanProductsRequest.BuyDownFeeStrategyEnum.EQUAL_AMORTIZATION)
                     .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.FEE)
-                    .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue())
+                    .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue()).merchantBuyDownFee(true)
                     .incomeFromBuyDownAccountId(feeIncomeAccount.getAccountID().longValue()));
 
             final GetLoanProductsProductIdResponse loanProductsProductIdResponse = loanProductHelper
@@ -332,7 +339,7 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                     .enableBuyDownFee(true).buyDownFeeCalculationType(PostLoanProductsRequest.BuyDownFeeCalculationTypeEnum.FLAT)
                     .buyDownFeeStrategy(PostLoanProductsRequest.BuyDownFeeStrategyEnum.EQUAL_AMORTIZATION)
                     .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.FEE)
-                    .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue())
+                    .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue()).merchantBuyDownFee(true)
                     .incomeFromBuyDownAccountId(feeIncomeAccount.getAccountID().longValue()));
 
             final GetLoanProductsProductIdResponse loanProductsProductIdResponse = loanProductHelper
@@ -355,12 +362,28 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                     loanProductsProductIdResponse.getAccountingMappings().getIncomeFromBuyDownAccount().getId());
 
             loanProductHelper.updateLoanProductById(loanProductsResponse.getResourceId(),
-                    new PutLoanProductsProductIdRequest().enableBuyDownFee(false)
+                    new PutLoanProductsProductIdRequest()
                             .buyDownFeeIncomeType(PutLoanProductsProductIdRequest.BuyDownFeeIncomeTypeEnum.INTEREST)
                             .incomeFromBuyDownAccountId(interestIncomeAccount.getAccountID().longValue()));
 
-            final GetLoanProductsProductIdResponse updatedLoanProductsProductIdResponse = loanProductHelper
+            GetLoanProductsProductIdResponse updatedLoanProductsProductIdResponse = loanProductHelper
                     .retrieveLoanProductById(loanProductsResponse.getResourceId());
+            Assertions.assertEquals(Boolean.TRUE, updatedLoanProductsProductIdResponse.getEnableBuyDownFee());
+            Assertions.assertEquals(LoanBuyDownFeeStrategy.EQUAL_AMORTIZATION.getCode(),
+                    updatedLoanProductsProductIdResponse.getBuyDownFeeStrategy().getCode());
+            Assertions.assertNotNull(updatedLoanProductsProductIdResponse.getBuyDownFeeIncomeType());
+            Assertions.assertEquals(LoanBuyDownFeeIncomeType.INTEREST.getCode(),
+                    updatedLoanProductsProductIdResponse.getBuyDownFeeIncomeType().getCode());
+            Assertions.assertNotNull(updatedLoanProductsProductIdResponse.getAccountingMappings());
+            Assertions.assertEquals(buyDownExpenseAccount.getAccountID().longValue(),
+                    updatedLoanProductsProductIdResponse.getAccountingMappings().getBuyDownExpenseAccount().getId());
+            Assertions.assertEquals(interestIncomeAccount.getAccountID().longValue(),
+                    updatedLoanProductsProductIdResponse.getAccountingMappings().getIncomeFromBuyDownAccount().getId());
+
+            loanProductHelper.updateLoanProductById(loanProductsResponse.getResourceId(),
+                    new PutLoanProductsProductIdRequest().enableBuyDownFee(false));
+
+            updatedLoanProductsProductIdResponse = loanProductHelper.retrieveLoanProductById(loanProductsResponse.getResourceId());
             Assertions.assertEquals(Boolean.FALSE, updatedLoanProductsProductIdResponse.getEnableBuyDownFee());
             Assertions.assertNotNull(updatedLoanProductsProductIdResponse.getBuyDownFeeCalculationType());
             Assertions.assertEquals(LoanBuyDownFeeCalculationType.FLAT.getCode(),
@@ -369,14 +392,9 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
             Assertions.assertEquals(LoanBuyDownFeeStrategy.EQUAL_AMORTIZATION.getCode(),
                     updatedLoanProductsProductIdResponse.getBuyDownFeeStrategy().getCode());
             Assertions.assertNotNull(updatedLoanProductsProductIdResponse.getBuyDownFeeIncomeType());
-            Assertions.assertEquals(LoanBuyDownFeeIncomeType.INTEREST.getCode(),
-                    updatedLoanProductsProductIdResponse.getBuyDownFeeIncomeType().getCode());
-
             Assertions.assertNotNull(updatedLoanProductsProductIdResponse.getAccountingMappings());
-            Assertions.assertEquals(buyDownExpenseAccount.getAccountID().longValue(),
-                    updatedLoanProductsProductIdResponse.getAccountingMappings().getBuyDownExpenseAccount().getId());
-            Assertions.assertEquals(interestIncomeAccount.getAccountID().longValue(),
-                    updatedLoanProductsProductIdResponse.getAccountingMappings().getIncomeFromBuyDownAccount().getId());
+            Assertions.assertNull(updatedLoanProductsProductIdResponse.getAccountingMappings().getBuyDownExpenseAccount());
+            Assertions.assertNull(updatedLoanProductsProductIdResponse.getAccountingMappings().getIncomeFromBuyDownAccount());
         }
 
         @Test
@@ -386,7 +404,7 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                             .buyDownFeeCalculationType(PostLoanProductsRequest.BuyDownFeeCalculationTypeEnum.FLAT)
                             .buyDownFeeStrategy(PostLoanProductsRequest.BuyDownFeeStrategyEnum.EQUAL_AMORTIZATION)
                             .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.FEE)
-                            .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue())
+                            .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue()).merchantBuyDownFee(true)
                             .incomeFromBuyDownAccountId(feeIncomeAccount.getAccountID().longValue())));
         }
 
@@ -396,7 +414,7 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                     () -> loanProductHelper.createLoanProduct(create4IProgressive().enableBuyDownFee(true)
                             .buyDownFeeStrategy(PostLoanProductsRequest.BuyDownFeeStrategyEnum.EQUAL_AMORTIZATION)
                             .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.FEE)
-                            .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue())
+                            .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue()).merchantBuyDownFee(true)
                             .incomeFromBuyDownAccountId(feeIncomeAccount.getAccountID().longValue())));
         }
 
@@ -406,7 +424,7 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                     () -> loanProductHelper.createLoanProduct(create4IProgressive().enableBuyDownFee(true)
                             .buyDownFeeCalculationType(PostLoanProductsRequest.BuyDownFeeCalculationTypeEnum.FLAT)
                             .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.FEE)
-                            .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue())
+                            .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue()).merchantBuyDownFee(true)
                             .incomeFromBuyDownAccountId(feeIncomeAccount.getAccountID().longValue())));
         }
 
@@ -416,7 +434,7 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                     () -> loanProductHelper.createLoanProduct(create4IProgressive().enableBuyDownFee(true)
                             .buyDownFeeCalculationType(PostLoanProductsRequest.BuyDownFeeCalculationTypeEnum.FLAT)
                             .buyDownFeeStrategy(PostLoanProductsRequest.BuyDownFeeStrategyEnum.EQUAL_AMORTIZATION)
-                            .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue())
+                            .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue()).merchantBuyDownFee(true)
                             .incomeFromBuyDownAccountId(feeIncomeAccount.getAccountID().longValue())));
         }
 
@@ -426,7 +444,7 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                     () -> loanProductHelper.createLoanProduct(create4IProgressive().enableBuyDownFee(true)
                             .buyDownFeeCalculationType(PostLoanProductsRequest.BuyDownFeeCalculationTypeEnum.FLAT)
                             .buyDownFeeStrategy(PostLoanProductsRequest.BuyDownFeeStrategyEnum.EQUAL_AMORTIZATION)
-                            .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.FEE)
+                            .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.FEE).merchantBuyDownFee(true)
                             .incomeFromBuyDownAccountId(feeIncomeAccount.getAccountID().longValue())));
         }
 
@@ -436,7 +454,7 @@ public class LoanProductTest extends BaseLoanIntegrationTest {
                     () -> loanProductHelper.createLoanProduct(create4IProgressive().enableBuyDownFee(true)
                             .buyDownFeeCalculationType(PostLoanProductsRequest.BuyDownFeeCalculationTypeEnum.FLAT)
                             .buyDownFeeStrategy(PostLoanProductsRequest.BuyDownFeeStrategyEnum.EQUAL_AMORTIZATION)
-                            .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.FEE)
+                            .buyDownFeeIncomeType(PostLoanProductsRequest.BuyDownFeeIncomeTypeEnum.FEE).merchantBuyDownFee(true)
                             .buyDownExpenseAccountId(buyDownExpenseAccount.getAccountID().longValue())));
         }
     }

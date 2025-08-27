@@ -34,14 +34,11 @@ import org.apache.fineract.accounting.journalentry.data.ChargePaymentDTO;
 import org.apache.fineract.accounting.journalentry.data.GLAccountBalanceHolder;
 import org.apache.fineract.accounting.journalentry.data.LoanDTO;
 import org.apache.fineract.accounting.journalentry.data.LoanTransactionDTO;
-import org.apache.fineract.accounting.journalentry.domain.JournalEntryRepository;
 import org.apache.fineract.accounting.producttoaccountmapping.domain.ProductToGLAccountMapping;
 import org.apache.fineract.infrastructure.core.service.MathUtil;
 import org.apache.fineract.organisation.office.domain.Office;
 import org.apache.fineract.portfolio.PortfolioProductType;
 import org.apache.fineract.portfolio.loanaccount.data.LoanTransactionEnumData;
-import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionRepository;
-import org.apache.fineract.portfolio.loanaccount.repository.LoanCapitalizedIncomeBalanceRepository;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -50,9 +47,6 @@ public class AccrualBasedAccountingProcessorForLoan implements AccountingProcess
 
     private final AccountingProcessorHelper helper;
     private final JournalEntryWritePlatformService journalEntryWritePlatformService;
-    private final LoanCapitalizedIncomeBalanceRepository loanCapitalizedIncomeBalanceRepository;
-    private final JournalEntryRepository journalEntryRepository;
-    private final LoanTransactionRepository loanTransactionRepository;
 
     @Override
     public void createJournalEntriesForLoan(final LoanDTO loanDTO) {
@@ -441,8 +435,10 @@ public class AccrualBasedAccountingProcessorForLoan implements AccountingProcess
         final BigDecimal amount = loanTransactionDTO.getAmount();
         final Long paymentTypeId = loanTransactionDTO.getPaymentTypeId();
 
+        final AccrualAccountsForLoan debitAccountType = loanDTO.isMerchantBuyDownFee() ? AccrualAccountsForLoan.BUY_DOWN_EXPENSE
+                : AccrualAccountsForLoan.FUND_SOURCE;
         if (MathUtil.isGreaterThanZero(amount)) {
-            this.helper.createJournalEntriesForLoan(office, currencyCode, AccrualAccountsForLoan.BUY_DOWN_EXPENSE.getValue(),
+            this.helper.createJournalEntriesForLoan(office, currencyCode, debitAccountType.getValue(),
                     AccrualAccountsForLoan.DEFERRED_INCOME_LIABILITY.getValue(), loanProductId, paymentTypeId, loanId, transactionId,
                     transactionDate, amount);
         }
@@ -461,12 +457,14 @@ public class AccrualBasedAccountingProcessorForLoan implements AccountingProcess
         final BigDecimal amount = loanTransactionDTO.getAmount();
         final Long paymentTypeId = loanTransactionDTO.getPaymentTypeId();
 
+        final AccrualAccountsForLoan debitAccountType = loanDTO.isMerchantBuyDownFee() ? AccrualAccountsForLoan.BUY_DOWN_EXPENSE
+                : AccrualAccountsForLoan.FUND_SOURCE;
         if (MathUtil.isGreaterThanZero(amount)) {
             // Mirror of Buy Down Fee entries (as per PS-2574 requirements)
-            // Debit: Deferred Income Liability, Credit: Buy Down Expense
+            // Debit: Deferred Income Liability, Credit: Buy Down Expense (merchant)
+            // Debit: Deferred Income Liability, Credit: Fund Source (non merchant)
             this.helper.createJournalEntriesForLoan(office, currencyCode, AccrualAccountsForLoan.DEFERRED_INCOME_LIABILITY.getValue(),
-                    AccrualAccountsForLoan.BUY_DOWN_EXPENSE.getValue(), loanProductId, paymentTypeId, loanId, transactionId,
-                    transactionDate, amount);
+                    debitAccountType.getValue(), loanProductId, paymentTypeId, loanId, transactionId, transactionDate, amount);
         }
     }
 

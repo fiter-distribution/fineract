@@ -201,7 +201,8 @@ public final class LoanProductDataValidator {
             LoanProductConstants.CAPITALIZED_INCOME_STRATEGY_PARAM_NAME, LoanProductConstants.CAPITALIZED_INCOME_TYPE_PARAM_NAME,
             LoanProductConstants.ENABLE_BUY_DOWN_FEE_PARAM_NAME, LoanProductConstants.BUY_DOWN_FEE_CALCULATION_TYPE_PARAM_NAME,
             LoanProductConstants.BUY_DOWN_FEE_STRATEGY_PARAM_NAME, LoanProductConstants.BUY_DOWN_FEE_INCOME_TYPE_PARAM_NAME,
-            LoanProductAccountingParams.BUY_DOWN_EXPENSE.getValue(), LoanProductAccountingParams.INCOME_FROM_BUY_DOWN.getValue()));
+            LoanProductAccountingParams.BUY_DOWN_EXPENSE.getValue(), LoanProductAccountingParams.INCOME_FROM_BUY_DOWN.getValue(),
+            LoanProductConstants.MERCHANT_BUY_DOWN_FEE_PARAM_NAME));
 
     private static final String[] SUPPORTED_LOAN_CONFIGURABLE_ATTRIBUTES = { LoanProductConstants.amortizationTypeParamName,
             LoanProductConstants.interestTypeParamName, LoanProductConstants.transactionProcessingStrategyCodeParamName,
@@ -786,7 +787,7 @@ public final class LoanProductDataValidator {
             }
         }
 
-        validateMultiDisburseLoanData(baseDataValidator, element);
+        validateMultiDisburseLoanData(baseDataValidator, element, null);
 
         validateLoanConfigurableAttributes(baseDataValidator, element);
 
@@ -1014,7 +1015,8 @@ public final class LoanProductDataValidator {
         }
     }
 
-    private void validateMultiDisburseLoanData(final DataValidatorBuilder baseDataValidator, final JsonElement element) {
+    private void validateMultiDisburseLoanData(final DataValidatorBuilder baseDataValidator, final JsonElement element,
+            final LoanProduct loanProduct) {
         Boolean multiDisburseLoan = false;
         if (this.fromApiJsonHelper.parameterExists(LoanProductConstants.MULTI_DISBURSE_LOAN_PARAMETER_NAME, element)) {
             multiDisburseLoan = this.fromApiJsonHelper.extractBooleanNamed(LoanProductConstants.MULTI_DISBURSE_LOAN_PARAMETER_NAME,
@@ -1045,12 +1047,32 @@ public final class LoanProductDataValidator {
                     .integerGreaterThanZero();
 
             final Integer interestType = this.fromApiJsonHelper.extractIntegerNamed(INTEREST_TYPE, element, Locale.getDefault());
-            baseDataValidator.reset().parameter(INTEREST_TYPE).value(interestType).ignoreIfNull()
-                    .integerSameAsNumber(InterestMethod.DECLINING_BALANCE.getValue());
+
+            boolean isProgressive = isProgressive(element, loanProduct);
+            if (isProgressive) {
+                baseDataValidator.reset().parameter(INTEREST_TYPE).value(interestType).ignoreIfNull().inMinMaxRange(0, 1);
+            } else {
+                baseDataValidator.reset().parameter(INTEREST_TYPE).value(interestType).ignoreIfNull()
+                        .integerSameAsNumber(InterestMethod.DECLINING_BALANCE.getValue());
+            }
         }
 
         final String overAppliedCalculationType = this.fromApiJsonHelper.extractStringNamed(OVER_APPLIED_CALCULATION_TYPE, element);
         baseDataValidator.reset().parameter(OVER_APPLIED_CALCULATION_TYPE).value(overAppliedCalculationType).notExceedingLengthOf(10);
+    }
+
+    private boolean isProgressive(JsonElement element, LoanProduct loanProduct) {
+        String processorCode = null;
+        if (loanProduct != null) {
+            processorCode = loanProduct.getTransactionProcessingStrategyCode();
+        }
+        final String transactionProcessingStrategyCode = this.fromApiJsonHelper.extractStringNamed(TRANSACTION_PROCESSING_STRATEGY_CODE,
+                element);
+        if (transactionProcessingStrategyCode != null) {
+            processorCode = loanRepaymentScheduleTransactionProcessorFactory.determineProcessor(transactionProcessingStrategyCode)
+                    .getCode();
+        }
+        return "advanced-payment-allocation-strategy".equals(processorCode);
     }
 
     private void validateInterestRecalculationParams(final JsonElement element, final DataValidatorBuilder baseDataValidator,
@@ -1868,7 +1890,7 @@ public final class LoanProductDataValidator {
             }
         }
 
-        validateMultiDisburseLoanData(baseDataValidator, element);
+        validateMultiDisburseLoanData(baseDataValidator, element, loanProduct);
 
         // validateLoanConfigurableAttributes(baseDataValidator,element);
 
@@ -2549,7 +2571,7 @@ public final class LoanProductDataValidator {
                 }
             } else if (loanProduct != null) {
                 if (!interestCalculationPeriodMethod.isDaily()) {
-                    considerPartialPeriodUpdates = loanProduct.getLoanProductRelatedDetail().isAllowPartialPeriodInterestCalcualtion();
+                    considerPartialPeriodUpdates = loanProduct.getLoanProductRelatedDetail().isAllowPartialPeriodInterestCalculation();
                 }
             }
 
@@ -2574,7 +2596,7 @@ public final class LoanProductDataValidator {
                 } else if (loanProduct != null) {
                     multiDisburseLoan = loanProduct.isMultiDisburseLoan();
                 }
-                if (multiDisburseLoan != null && multiDisburseLoan) {
+                if (multiDisburseLoan != null && multiDisburseLoan && !isProgressive(element, loanProduct)) {
                     baseDataValidator.reset().parameter(LoanProductConstants.MULTI_DISBURSE_LOAN_PARAMETER_NAME)
                             .failWithCode("not.supported.for.selected.interest.calculation.type");
                 }
@@ -2817,14 +2839,23 @@ public final class LoanProductDataValidator {
                 baseDataValidator.reset().parameter(LoanProductConstants.BUY_DOWN_FEE_INCOME_TYPE_PARAM_NAME).value(buyDownFeeIncomeType)
                         .isOneOfEnumValues(LoanBuyDownFeeIncomeType.class)
                         .cantBeBlankWhenParameterProvidedIs(LoanProductConstants.ENABLE_BUY_DOWN_FEE_PARAM_NAME, true);
+
                 // Accounting
                 if (AccountingValidations.isAccrualBasedAccounting(accountingRuleType)) {
-                    final Long deferredIncomeLiabilityAccountId = this.fromApiJsonHelper
-                            .extractLongNamed(LoanProductAccountingParams.BUY_DOWN_EXPENSE.getValue(), element);
-                    baseDataValidator.reset().parameter(LoanProductAccountingParams.BUY_DOWN_EXPENSE.getValue())
-                            .value(deferredIncomeLiabilityAccountId).notNull()
-                            .cantBeBlankWhenParameterProvidedIs(LoanProductConstants.ENABLE_BUY_DOWN_FEE_PARAM_NAME, true)
-                            .integerGreaterThanZero();
+                    if (this.fromApiJsonHelper.parameterExists(LoanProductConstants.MERCHANT_BUY_DOWN_FEE_PARAM_NAME, element)) {
+                        final Boolean merchantBuyDownFee = this.fromApiJsonHelper
+                                .extractBooleanNamed(LoanProductConstants.MERCHANT_BUY_DOWN_FEE_PARAM_NAME, element);
+                        baseDataValidator.reset().parameter(LoanProductConstants.MERCHANT_BUY_DOWN_FEE_PARAM_NAME).value(merchantBuyDownFee)
+                                .ignoreIfNull().validateForBooleanValue();
+                        if (Boolean.TRUE.equals(merchantBuyDownFee)) {
+                            final Long deferredIncomeLiabilityAccountId = this.fromApiJsonHelper
+                                    .extractLongNamed(LoanProductAccountingParams.BUY_DOWN_EXPENSE.getValue(), element);
+                            baseDataValidator.reset().parameter(LoanProductAccountingParams.BUY_DOWN_EXPENSE.getValue())
+                                    .value(deferredIncomeLiabilityAccountId).notNull()
+                                    .cantBeBlankWhenParameterProvidedIs(LoanProductConstants.ENABLE_BUY_DOWN_FEE_PARAM_NAME, true)
+                                    .integerGreaterThanZero();
+                        }
+                    }
                     final Long incomeFromDeferredIncomeAccountId = this.fromApiJsonHelper
                             .extractLongNamed(LoanProductAccountingParams.INCOME_FROM_BUY_DOWN.getValue(), element);
                     baseDataValidator.reset().parameter(LoanProductAccountingParams.INCOME_FROM_BUY_DOWN.getValue())

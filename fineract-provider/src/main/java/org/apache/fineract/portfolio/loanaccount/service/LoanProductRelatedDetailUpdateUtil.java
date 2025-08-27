@@ -201,15 +201,15 @@ public class LoanProductRelatedDetailUpdateUtil {
         }
 
         if (command.isChangeInBooleanParameterNamed(LoanProductConstants.ALLOW_PARTIAL_PERIOD_INTEREST_CALCUALTION_PARAM_NAME,
-                loanRepaymentScheduleDetail.isAllowPartialPeriodInterestCalcualtion())) {
+                loanRepaymentScheduleDetail.isAllowPartialPeriodInterestCalculation())) {
             final boolean newValue = command
                     .booleanPrimitiveValueOfParameterNamed(LoanProductConstants.ALLOW_PARTIAL_PERIOD_INTEREST_CALCUALTION_PARAM_NAME);
             actualChanges.put(LoanProductConstants.ALLOW_PARTIAL_PERIOD_INTEREST_CALCUALTION_PARAM_NAME, newValue);
-            loanRepaymentScheduleDetail.setAllowPartialPeriodInterestCalcualtion(newValue);
+            loanRepaymentScheduleDetail.setAllowPartialPeriodInterestCalculation(newValue);
         }
 
         if (loanRepaymentScheduleDetail.getInterestCalculationPeriodMethod().isDaily()) {
-            loanRepaymentScheduleDetail.setAllowPartialPeriodInterestCalcualtion(false);
+            loanRepaymentScheduleDetail.setAllowPartialPeriodInterestCalculation(false);
         }
 
         final String graceOnPrincipalPaymentParamName = "graceOnPrincipalPayment";
@@ -357,6 +357,13 @@ public class LoanProductRelatedDetailUpdateUtil {
                     .enumValueOfParameterNamed(LoanProductConstants.BUY_DOWN_FEE_INCOME_TYPE_PARAM_NAME, LoanBuyDownFeeIncomeType.class);
             actualChanges.put(LoanProductConstants.BUY_DOWN_FEE_INCOME_TYPE_PARAM_NAME, newValue);
             loanRepaymentScheduleDetail.setBuyDownFeeIncomeType(newValue);
+        }
+
+        if (command.isChangeInBooleanParameterNamed(LoanProductConstants.MERCHANT_BUY_DOWN_FEE_PARAM_NAME,
+                loanRepaymentScheduleDetail.isMerchantBuyDownFee())) {
+            final boolean newValue = command.booleanPrimitiveValueOfParameterNamed(LoanProductConstants.MERCHANT_BUY_DOWN_FEE_PARAM_NAME);
+            actualChanges.put(LoanProductConstants.MERCHANT_BUY_DOWN_FEE_PARAM_NAME, newValue);
+            loanRepaymentScheduleDetail.setMerchantBuyDownFee(newValue);
         }
 
         return actualChanges;
