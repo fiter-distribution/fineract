@@ -29,7 +29,9 @@ import lombok.Data;
 public final class CollectionData {
 
     private BigDecimal availableDisbursementAmount;
+    private BigDecimal availableDisbursementAmountWithOverApplied;
     private Long pastDueDays;
+    private LocalDate pastDueDate;
     private LocalDate nextPaymentDueDate;
     private BigDecimal nextPaymentAmount;
     private Long delinquentDays;
@@ -51,7 +53,8 @@ public final class CollectionData {
 
     public static CollectionData template() {
         final BigDecimal zero = BigDecimal.ZERO;
-        return new CollectionData(zero, 0L, null, zero, 0L, null, zero, null, zero, null, zero, null, null, zero, zero, zero, zero);
+        return new CollectionData(zero, zero, 0L, null, null, zero, 0L, null, zero, null, zero, null, zero, null, null, zero, zero, zero,
+                zero);
     }
 
 }

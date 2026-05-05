@@ -59,6 +59,7 @@ tasks.named('compileTestJava') {
 dependencies {
     testImplementation(project(':fineract-avro-schemas'))
     testImplementation(project(':fineract-client'))
+    testImplementation(project(':fineract-client-feign'))
 
     testImplementation 'org.springframework:spring-context'
     implementation 'org.springframework:spring-test'
@@ -67,8 +68,10 @@ dependencies {
     testImplementation 'com.github.spotbugs:spotbugs-annotations'
 
     testImplementation 'com.squareup.retrofit2:retrofit:2.11.0'
+    testImplementation 'io.github.openfeign:feign-core:13.6'
     testImplementation 'org.apache.httpcomponents:httpclient:4.5.14'
-    testImplementation 'org.apache.commons:commons-lang3:3.17.0'
+    testImplementation 'org.apache.commons:commons-lang3:3.18.0'
+    testImplementation 'com.google.guava:guava'
     testImplementation ('com.googlecode.json-simple:json-simple:1.1.1') {
         exclude group: 'junit', module: 'junit'
     }
@@ -88,8 +91,8 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok:1.18.36'
     testAnnotationProcessor 'org.projectlombok:lombok:1.18.36'
 
-    testImplementation "ch.qos.logback:logback-core:1.5.17"
-    testImplementation "ch.qos.logback:logback-classic:1.5.17"
+    testImplementation "ch.qos.logback:logback-core:1.5.19"
+    testImplementation "ch.qos.logback:logback-classic:1.5.19"
 
     testImplementation 'org.apache.activemq:activemq-client:6.1.6'
     testImplementation "org.apache.avro:avro:1.12.0"
@@ -97,8 +100,35 @@ dependencies {
     testImplementation 'io.github.classgraph:classgraph:4.8.179'
 
     testImplementation 'org.apache.commons:commons-collections4:4.4'
+
+    testImplementation 'org.springframework:spring-jdbc'
+    testImplementation 'org.postgresql:postgresql'
+    testImplementation 'org.mariadb.jdbc:mariadb-java-client'
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs.add("-parameters")
+}
+
+// Configure the jar task to include test classes and resources
+tasks.named('jar') {
+    from sourceSets.test.output
+    
+    // Include the test resources
+    from(sourceSets.test.resources) {
+        // Handle duplicate files by using the first one found
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+    
+    // Include the manifest with the classpath
+    manifest {
+        attributes(
+            'Implementation-Title': project.name,
+            'Implementation-Version': project.version,
+            'Built-By': System.getProperty('user.name'),
+            'Built-Date': new Date(),
+            'Created-By': 'Gradle ' + gradle.gradleVersion,
+            'Build-Jdk': System.getProperty('java.version')
+        )
+    }
 }

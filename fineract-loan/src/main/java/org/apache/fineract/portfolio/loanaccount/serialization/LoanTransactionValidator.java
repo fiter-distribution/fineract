@@ -40,6 +40,11 @@ public interface LoanTransactionValidator {
 
     void validateTransaction(String json);
 
+    default void validateTransaction(Loan loan, LoanTransactionType loanTransactionType, String json) {
+        validateTransaction(json);
+        validateLoanNotClosedOrOverpaidForTransactions(loan, loanTransactionType);
+    }
+
     void validateChargebackTransaction(String json);
 
     void validateNewRepaymentTransaction(String json);
@@ -96,4 +101,10 @@ public interface LoanTransactionValidator {
     void validateReversalExternalId(DataValidatorBuilder baseDataValidator, JsonElement element);
 
     void validateManualInterestRefundTransaction(String json);
+
+    void validateClassificationCodeValue(String codeName, Long transactionClassificationId, DataValidatorBuilder baseDataValidator);
+
+    void validateLoanNotClosedOrOverpaidForTransactions(Loan loan);
+
+    void validateLoanNotClosedOrOverpaidForTransactions(Loan loan, LoanTransactionType loanTransactionType);
 }

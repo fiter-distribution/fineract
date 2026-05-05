@@ -20,11 +20,12 @@ package org.apache.fineract.infrastructure.core.service;
 
 import static java.time.temporal.ChronoUnit.DAYS;
 
-import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.MonthDay;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -41,6 +42,7 @@ import org.apache.fineract.infrastructure.core.data.ApiParameterError;
 import org.apache.fineract.infrastructure.core.domain.FineractPlatformTenant;
 import org.apache.fineract.infrastructure.core.exception.PlatformApiDataValidationException;
 import org.apache.fineract.infrastructure.core.serialization.JsonParserHelper;
+import org.springframework.lang.NonNull;
 
 public final class DateUtils {
 
@@ -86,8 +88,8 @@ public final class DateUtils {
         return truncate == null ? now : now.truncatedTo(truncate);
     }
 
-    @NotNull
-    public static OffsetDateTime getOffsetDateTimeOfTenantFromLocalDate(@NotNull final LocalDate date) {
+    @NonNull
+    public static OffsetDateTime getOffsetDateTimeOfTenantFromLocalDate(@NonNull final LocalDate date) {
         return OffsetDateTime.of(date.atStartOfDay(), getOffsetDateTimeOfTenant().getOffset());
     }
 
@@ -178,7 +180,7 @@ public final class DateUtils {
         return compare(first, second, null, false);
     }
 
-    public static int compareWithNullsLast(@NotNull Optional<OffsetDateTime> first, @NotNull Optional<OffsetDateTime> second) {
+    public static int compareWithNullsLast(@NonNull Optional<OffsetDateTime> first, @NonNull Optional<OffsetDateTime> second) {
         return compareWithNullsLast(first.orElse(null), second.orElse(null));
     }
 
@@ -302,14 +304,14 @@ public final class DateUtils {
         return isAfter(first, second) || isEqual(first, second);
     }
 
-    public static long getDifference(LocalDate first, LocalDate second, @NotNull ChronoUnit unit) {
+    public static long getDifference(LocalDate first, LocalDate second, @NonNull ChronoUnit unit) {
         if (first == null || second == null) {
             throw new IllegalArgumentException("Dates must not be null to get difference");
         }
         return unit.between(first, second);
     }
 
-    public static int getExactDifference(LocalDate first, LocalDate second, @NotNull ChronoUnit unit) {
+    public static int getExactDifference(LocalDate first, LocalDate second, @NonNull ChronoUnit unit) {
         return Math.toIntExact(getDifference(first, second, unit));
     }
 
@@ -413,7 +415,7 @@ public final class DateUtils {
         return fromDate != null && DateUtils.isAfter(targetDate, fromDate) && !DateUtils.isAfter(targetDate, toDate);
     }
 
-    @NotNull
+    @NonNull
     private static DateTimeFormatter getDateFormatter(String format, Locale locale) {
         DateTimeFormatter formatter = DEFAULT_DATE_FORMATTER;
         if (format != null || locale != null) {
@@ -425,7 +427,7 @@ public final class DateUtils {
         return formatter;
     }
 
-    @NotNull
+    @NonNull
     private static DateTimeFormatter getDateTimeFormatter(String format, Locale locale) {
         DateTimeFormatter formatter = DEFAULT_DATETIME_FORMATTER;
         if (format != null || locale != null) {
@@ -460,5 +462,43 @@ public final class DateUtils {
                     "The parameter date (" + dateTimeStr + ") format is invalid", "date", dateTimeStr));
             throw new PlatformApiDataValidationException("validation.msg.validation.errors.exist", "Validation errors exist.", errors, e);
         }
+    }
+
+    /**
+     * Returns the earlier date. If date1 is before date2 it return date1 otherwise date2.
+     *
+     * @param date1
+     *            non null date1
+     * @param date2
+     *            non null date2
+     * @return earlier date
+     */
+    public static LocalDate min(@NonNull LocalDate date1, @NonNull LocalDate date2) {
+        return date1.isBefore(date2) ? date1 : date2;
+    }
+
+    /**
+     * Builds a {@link MonthDay} from month and day, clamping the day to the last valid day of the month for the current
+     * business year if necessary. Use when reading (month, day) from storage (e.g. fee_on_month, fee_on_day) where the
+     * combination may be invalid (e.g. day 30 for February).
+     * <p>
+     * The year is derived from {@link #getBusinessLocalDate()}. This makes February sensitive to leap years:
+     * <ul>
+     * <li>In a leap year, February allows 29 (Feb 30/31 are clamped to 29).</li>
+     * <li>In a non-leap year, February is clamped to 28 (Feb 29/30/31 are clamped to 28).</li>
+     * </ul>
+     *
+     * @param month
+     *            month 1–12
+     * @param day
+     *            day of month (may exceed month length; will be clamped)
+     * @return valid MonthDay (day clamped to month length for the current business year)
+     */
+    public static MonthDay safeMonthDay(int month, int day) {
+        LocalDate businessDate = getBusinessLocalDate();
+        int year = businessDate.getYear();
+        int maxDay = YearMonth.of(year, month).lengthOfMonth();
+        int safeDay = Math.min(day, maxDay);
+        return MonthDay.of(month, safeDay);
     }
 }

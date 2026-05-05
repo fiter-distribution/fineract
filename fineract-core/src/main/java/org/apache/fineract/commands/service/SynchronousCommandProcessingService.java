@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +62,8 @@ import org.apache.fineract.infrastructure.security.service.PlatformSecurityConte
 import org.apache.fineract.useradministration.domain.AppUser;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @Slf4j
@@ -166,13 +169,12 @@ public class SynchronousCommandProcessingService implements CommandProcessingSer
 
         try {
             CommandSource finalCommandSource = commandSource;
+            AtomicInteger attemptNumber = new AtomicInteger(0);
             CommandSource savedCommandSource = persistenceRetry.executeSupplier(() -> {
-                // Get metrics for logging
-                long attemptNumber = persistenceRetry.getMetrics().getNumberOfFailedCallsWithRetryAttempt() + 1;
-
                 // Critical: Refetch on retry attempts (not on first attempt)
                 CommandSource currentSource = finalCommandSource;
-                if (attemptNumber > 1) {
+                attemptNumber.getAndIncrement();
+                if (attemptNumber.get() > 1 && commandSource.getId() != null) {
                     log.info("Retrying command result save - attempt {} for command ID {}", attemptNumber, finalCommandSource.getId());
                     currentSource = commandSourceService.getCommandSource(finalCommandSource.getId());
                 }
@@ -197,8 +199,23 @@ public class SynchronousCommandProcessingService implements CommandProcessingSer
         }
 
         result.setRollbackTransaction(null);
-        publishHookEvent(wrapper.entityName(), wrapper.actionName(), command, result); // TODO must be performed in a
-        // new transaction
+
+        // When running inside an enclosing batch transaction, defer hook publication
+        // until after the transaction commits. This prevents webhooks from firing for
+        // commands that are subsequently rolled back when a later command in the batch
+        // fails (e.g. a withdrawal succeeds but its fee charge fails, rolling back both).
+        if (isEnclosingTransaction && TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+
+                @Override
+                public void afterCommit() {
+                    publishHookEvent(wrapper.entityName(), wrapper.actionName(), command, result);
+                }
+            });
+        } else {
+            publishHookEvent(wrapper.entityName(), wrapper.actionName(), command, result);
+        }
+
         return result;
     }
 

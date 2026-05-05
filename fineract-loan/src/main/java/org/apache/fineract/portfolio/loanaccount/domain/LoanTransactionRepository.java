@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.fineract.infrastructure.codes.domain.CodeValue;
 import org.apache.fineract.infrastructure.core.domain.ExternalId;
 import org.apache.fineract.portfolio.loanaccount.data.CumulativeIncomeFromIncomePosting;
 import org.apache.fineract.portfolio.loanaccount.data.LoanScheduleDelinquencyData;
@@ -317,36 +318,6 @@ public interface LoanTransactionRepository extends JpaRepository<LoanTransaction
     @Query("""
             SELECT lt FROM LoanTransaction lt
             WHERE lt.loan = :loan
-                AND (
-                    (lt.reversed = true AND lt.id IN :existingTransactionIds AND lt.id NOT IN :existingReversedTransactionIds)
-                    OR (lt.id NOT IN :existingTransactionIds)
-                )
-            """)
-    List<LoanTransaction> findTransactionsForAccountingBridge(@Param("loan") Loan loan,
-            @Param("existingTransactionIds") List<Long> existingTransactionIds,
-            @Param("existingReversedTransactionIds") List<Long> existingReversedTransactionIds);
-
-    @Query("""
-            SELECT lt FROM LoanTransaction lt
-            WHERE lt.loan = :loan
-                AND (
-                    (lt.reversed = true AND lt.id IN :existingTransactionIds)
-                    OR (lt.id NOT IN :existingTransactionIds)
-                )
-            """)
-    List<LoanTransaction> findTransactionsForAccountingBridge(@Param("loan") Loan loan,
-            @Param("existingTransactionIds") List<Long> existingTransactionIds);
-
-    @Query("""
-            SELECT lt FROM LoanTransaction lt
-            WHERE lt.loan = :loan
-                AND lt.reversed = false
-            """)
-    List<LoanTransaction> findNonReversedByLoan(@Param("loan") Loan loan);
-
-    @Query("""
-            SELECT lt FROM LoanTransaction lt
-            WHERE lt.loan = :loan
                 AND lt.reversed = false
                 AND lt.typeOf = :type
                 AND lt.dateOf IN :transactionDates
@@ -354,6 +325,17 @@ public interface LoanTransactionRepository extends JpaRepository<LoanTransaction
             """)
     List<LoanTransaction> findNonReversedLoanAndTypeAndDates(@Param("loan") Loan loan, @Param("type") LoanTransactionType type,
             @Param("transactionDates") Set<LocalDate> transactionDates);
+
+    @Query("""
+            SELECT lt FROM LoanTransaction lt
+            WHERE lt.loan = :loan
+                AND lt.reversed = false
+                AND lt.typeOf = :type
+                AND lt.dateOf = :transactionDate
+            ORDER BY lt.dateOf, lt.createdDate, lt.id
+            """)
+    List<LoanTransaction> findNonReversedLoanAndTypeAndDate(@Param("loan") Loan loan, @Param("type") LoanTransactionType type,
+            @Param("transactionDate") LocalDate transactionDate);
 
     @Query("""
             SELECT lt FROM LoanTransaction lt
@@ -482,54 +464,21 @@ public interface LoanTransactionRepository extends JpaRepository<LoanTransaction
     BigDecimal calculateTotalRecoveryPaymentAmount(@Param("loan") Loan loan);
 
     @Query("""
-            SELECT lt FROM LoanTransaction lt
+            SELECT CASE WHEN COUNT(lt) > 0 THEN true ELSE false END
+            FROM LoanTransaction lt
             WHERE lt.loan = :loan
-                AND (
-                    (:dateComparison = 'BEFORE' AND lt.dateOf < :chargeOffDate) OR
-                    (:dateComparison = 'EQUAL' AND lt.dateOf = :chargeOffDate) OR
-                    (:dateComparison = 'AFTER' AND lt.dateOf > :chargeOffDate)
-                )
-                AND (
-                    (lt.reversed = true AND lt.id IN :existingTransactionIds AND lt.id NOT IN :existingReversedTransactionIds)
-                    OR (lt.id NOT IN :existingTransactionIds)
-                )
-            ORDER BY lt.dateOf, lt.createdDate, lt.id
-            """)
-    List<LoanTransaction> findTransactionsForChargeOffClassification(@Param("loan") Loan loan,
-            @Param("chargeOffDate") LocalDate chargeOffDate, @Param("dateComparison") String dateComparison,
-            @Param("existingTransactionIds") List<Long> existingTransactionIds,
-            @Param("existingReversedTransactionIds") List<Long> existingReversedTransactionIds);
-
-    @Query("""
-            SELECT lt FROM LoanTransaction lt
-            WHERE lt.loan = :loan
-                AND (
-                    (:dateComparison = 'BEFORE' AND lt.dateOf < :chargeOffDate) OR
-                    (:dateComparison = 'EQUAL' AND lt.dateOf = :chargeOffDate) OR
-                    (:dateComparison = 'AFTER' AND lt.dateOf > :chargeOffDate)
-                )
-                AND (
-                    (lt.reversed = true AND lt.id IN :existingTransactionIds)
-                    OR (lt.id NOT IN :existingTransactionIds)
-                )
-            ORDER BY lt.dateOf, lt.createdDate, lt.id
-            """)
-    List<LoanTransaction> findTransactionsForChargeOffClassification(@Param("loan") Loan loan,
-            @Param("chargeOffDate") LocalDate chargeOffDate, @Param("dateComparison") String dateComparison,
-            @Param("existingTransactionIds") List<Long> existingTransactionIds);
-
-    @Query("""
-            SELECT lt FROM LoanTransaction lt
-            WHERE lt.loan = :loan
-                AND (
-                    (:dateComparison = 'BEFORE' AND lt.dateOf < :chargeOffDate) OR
-                    (:dateComparison = 'EQUAL' AND lt.dateOf = :chargeOffDate) OR
-                    (:dateComparison = 'AFTER' AND lt.dateOf > :chargeOffDate)
-                )
                 AND lt.reversed = false
-            ORDER BY lt.dateOf, lt.createdDate, lt.id
+                AND lt.typeOf = :type
+                AND lt.dateOf = :transactionDate
             """)
-    List<LoanTransaction> findTransactionsForChargeOffClassification(@Param("loan") Loan loan,
-            @Param("chargeOffDate") LocalDate chargeOffDate, @Param("dateComparison") String dateComparison);
+    boolean existsNonReversedByLoanAndTypeAndDate(@Param("loan") Loan loan, @Param("type") LoanTransactionType type,
+            @Param("transactionDate") LocalDate transactionDate);
+
+    @Query("""
+            SELECT lt.classification
+            FROM LoanTransaction lt
+            WHERE lt.id = :transactionId
+            """)
+    CodeValue fetchClassificationCodeValueByTransactionId(@Param("transactionId") Long transactionId);
 
 }

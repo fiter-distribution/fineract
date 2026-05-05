@@ -200,10 +200,12 @@ public class ClasspathDuplicatesStepDefinitions implements En {
                 // errorprone with Java 11 integration leaks to classpath, which
                 // causes a conflict between
                 // checkerframework/checker-qual and checkerframework/dataflow
-                || resourcePath.startsWith("org/checkerframework/dataflow/qual/") //
+                || resourcePath.startsWith("org/checkerframework/") //
                 // Pentaho reports harmless duplicates
                 || resourcePath.endsWith("overview.html") //
                 || resourcePath.endsWith("classic-engine.properties") //
-                || resourcePath.endsWith("loader.properties"); //
+                || resourcePath.endsWith("loader.properties") //
+                // ProGuard configuration files are safe to have multiple versions of
+                || resourcePath.equals("META-INF/proguard/gson.pro"); //
     }
 }

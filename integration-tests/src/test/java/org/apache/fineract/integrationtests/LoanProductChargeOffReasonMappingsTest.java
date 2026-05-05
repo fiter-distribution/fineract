@@ -36,9 +36,9 @@ import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.accounting.Account;
 import org.apache.fineract.integrationtests.common.products.DelinquencyBucketsHelper;
 import org.apache.fineract.integrationtests.common.system.CodeHelper;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.springframework.lang.NonNull;
 
 public class LoanProductChargeOffReasonMappingsTest extends BaseLoanIntegrationTest {
 
@@ -60,7 +60,7 @@ public class LoanProductChargeOffReasonMappingsTest extends BaseLoanIntegrationT
             Assertions.assertEquals(expenseAccount.getAccountID().longValue(),
                     loanProductDetails.getChargeOffReasonToExpenseAccountMappings().get(0).getExpenseAccount().getId());
             Assertions.assertEquals(Long.valueOf(chargeOffReasons),
-                    loanProductDetails.getChargeOffReasonToExpenseAccountMappings().get(0).getChargeOffReasonCodeValue().getId());
+                    loanProductDetails.getChargeOffReasonToExpenseAccountMappings().get(0).getReasonCodeValue().getId());
 
             List<PostChargeOffReasonToExpenseAccountMappings> chargeOffReasonToExpenseAccountMappings = createPostChargeOffReasonToExpenseAccountMappings(
                     Long.valueOf(chargeOffReasons), otherExpenseAccount.getAccountID().longValue());
@@ -72,7 +72,7 @@ public class LoanProductChargeOffReasonMappingsTest extends BaseLoanIntegrationT
             Assertions.assertEquals(otherExpenseAccount.getAccountID().longValue(),
                     loanProductDetails.getChargeOffReasonToExpenseAccountMappings().get(0).getExpenseAccount().getId());
             Assertions.assertEquals(Long.valueOf(chargeOffReasons),
-                    loanProductDetails.getChargeOffReasonToExpenseAccountMappings().get(0).getChargeOffReasonCodeValue().getId());
+                    loanProductDetails.getChargeOffReasonToExpenseAccountMappings().get(0).getReasonCodeValue().getId());
         });
     }
 
@@ -122,7 +122,7 @@ public class LoanProductChargeOffReasonMappingsTest extends BaseLoanIntegrationT
         final Integer fundId = createFund(requestSpec, responseSpec);
         Assertions.assertNotNull(fundId);
 
-        final Integer delinquencyBucketId = DelinquencyBucketsHelper.createDelinquencyBucket(requestSpec, responseSpec);
+        final Long delinquencyBucketId = DelinquencyBucketsHelper.createDefaultBucket();
         Assertions.assertNotNull(delinquencyBucketId);
 
         return new PostLoanProductsRequest()//
@@ -222,10 +222,10 @@ public class LoanProductChargeOffReasonMappingsTest extends BaseLoanIntegrationT
                 .interestRecalculationCompoundingMethod(0)//
                 .recalculationRestFrequencyType(2)//
                 .recalculationRestFrequencyInterval(1)//
-                .allowPartialPeriodInterestCalcualtion(false);//
+                .allowPartialPeriodInterestCalculation(false);//
     }
 
-    @NotNull
+    @NonNull
     private static List<PostChargeOffReasonToExpenseAccountMappings> createPostChargeOffReasonToExpenseAccountMappings(
             Long chargeOffReasonId, Long glAccountId) {
         List<PostChargeOffReasonToExpenseAccountMappings> chargeOffReasonToExpenseAccountMappings = new ArrayList<>();

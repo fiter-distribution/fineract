@@ -39,6 +39,7 @@ import java.util.Set;
 import java.util.function.Predicate;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.fineract.infrastructure.codes.domain.CodeValue;
 import org.apache.fineract.infrastructure.core.domain.AbstractAuditableWithUTCDateTimeCustom;
 import org.apache.fineract.infrastructure.core.domain.ExternalId;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
@@ -47,6 +48,7 @@ import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
 import org.apache.fineract.organisation.monetary.domain.Money;
 import org.apache.fineract.organisation.office.domain.Office;
 import org.apache.fineract.portfolio.loanaccount.domain.reaging.LoanReAgeParameter;
+import org.apache.fineract.portfolio.loanaccount.domain.reamortization.LoanReAmortizationParameter;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleType;
 import org.apache.fineract.portfolio.paymentdetail.domain.PaymentDetail;
 
@@ -143,6 +145,15 @@ public class LoanTransaction extends AbstractAuditableWithUTCDateTimeCustom<Long
     @Setter
     @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, mappedBy = "loanTransaction")
     private LoanReAgeParameter loanReAgeParameter;
+
+    @Setter
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY, mappedBy = "loanTransaction")
+    private LoanReAmortizationParameter loanReAmortizationParameter;
+
+    @Setter
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "classification_cv_id")
+    private CodeValue classification;
 
     protected LoanTransaction() {}
 
@@ -312,6 +323,10 @@ public class LoanTransaction extends AbstractAuditableWithUTCDateTimeCustom<Long
         if (LoanTransactionType.REAGE.equals(loanTransaction.getTypeOf())) {
             newTransaction.setLoanReAgeParameter(loanTransaction.getLoanReAgeParameter().getCopy(newTransaction));
         }
+        if (LoanTransactionType.REAMORTIZE.equals(loanTransaction.getTypeOf())) {
+            newTransaction.setLoanReAmortizationParameter(loanTransaction.getLoanReAmortizationParameter().getCopy(newTransaction));
+        }
+        newTransaction.setClassification(loanTransaction.getClassification());
         return newTransaction;
     }
 
@@ -906,6 +921,10 @@ public class LoanTransaction extends AbstractAuditableWithUTCDateTimeCustom<Long
             if (retainMappings != null) {
                 retainMappings.add(newMapping);
             }
+        }
+
+        if (retainMappings != null) {
+            retainMappings.removeIf(LoanTransactionToRepaymentScheduleMapping::isZeroAmount);
         }
     }
 

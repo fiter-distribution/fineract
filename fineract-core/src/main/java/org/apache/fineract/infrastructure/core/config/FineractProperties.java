@@ -19,7 +19,10 @@
 
 package org.apache.fineract.infrastructure.core.config;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -361,6 +364,7 @@ public class FineractProperties {
         private List<String> regexWhitelist;
         private boolean mimeWhitelistEnabled;
         private List<String> mimeWhitelist;
+        private Integer defaultBufferSize;
         private FineractContentFilesystemProperties filesystem;
         private FineractContentS3Properties s3;
     }
@@ -414,6 +418,16 @@ public class FineractProperties {
 
         private int stuckRetryThreshold;
         private boolean loanCobEnabled;
+        private FineractJournalEntryAggregationProperties journalEntryAggregation;
+    }
+
+    @Getter
+    @Setter
+    public static class FineractJournalEntryAggregationProperties {
+
+        private Integer excludeRecentNDays;
+        private boolean enabled;
+        private Integer chunkSize;
     }
 
     @Getter
@@ -504,40 +518,64 @@ public class FineractProperties {
 
         private FineractSecurityBasicAuth basicauth;
         private FineractSecurityTwoFactorAuth twoFactor;
-        private FineractSecurityOAuth oauth;
         private FineractSecurityHsts hsts;
+        private FineractSecurityOAuth2Properties oauth2;
+        private CorsProperties cors;
 
         public void set2fa(FineractSecurityTwoFactorAuth twoFactor) {
             this.twoFactor = twoFactor;
         }
-    }
 
-    @Getter
-    @Setter
-    public static class FineractSecurityBasicAuth {
+        @Getter
+        @Setter
+        public static class FineractSecurityOAuth2Properties {
 
-        private boolean enabled;
-    }
+            private boolean enabled;
+            private ClientProperties client;
 
-    @Getter
-    @Setter
-    public static class FineractSecurityTwoFactorAuth {
+            @Getter
+            @Setter
+            public static class ClientProperties implements Serializable {
 
-        private boolean enabled;
-    }
+                @Serial
+                private static final long serialVersionUID = 1L;
+                private Map<String, Registration> registrations = new HashMap<>();
 
-    @Getter
-    @Setter
-    public static class FineractSecurityOAuth {
+                @Getter
+                @Setter
+                public static final class Registration implements Serializable {
 
-        private boolean enabled;
-    }
+                    @Serial
+                    private static final long serialVersionUID = 1L;
+                    private String clientId;
+                    private List<String> scopes = new ArrayList<>();
+                    private List<String> authorizationGrantTypes = new ArrayList<>();
+                    private List<String> redirectUris = new ArrayList<>();
+                    private boolean requireAuthorizationConsent = true;
+                }
+            }
+        }
 
-    @Getter
-    @Setter
-    public static class FineractSecurityHsts {
+        @Getter
+        @Setter
+        public static class FineractSecurityBasicAuth {
 
-        private boolean enabled;
+            private boolean enabled;
+        }
+
+        @Getter
+        @Setter
+        public static class FineractSecurityTwoFactorAuth {
+
+            private boolean enabled;
+        }
+
+        @Getter
+        @Setter
+        public static class FineractSecurityHsts {
+
+            private boolean enabled;
+        }
     }
 
     @Getter
@@ -562,7 +600,7 @@ public class FineractProperties {
     public static class FineractModulesProperties {
 
         private FineractInvestorModuleProperties investor;
-        private FineractSelfServiceModuleProperties selfService;
+        private FineractLoanOriginationModuleProperties loanOrigination;
     }
 
     @Getter
@@ -573,7 +611,7 @@ public class FineractProperties {
 
     @Getter
     @Setter
-    public static class FineractSelfServiceModuleProperties extends AbstractFineractModuleProperties {
+    public static class FineractLoanOriginationModuleProperties extends AbstractFineractModuleProperties {
 
     }
 
@@ -651,5 +689,17 @@ public class FineractProperties {
 
             }
         }
+    }
+
+    @Getter
+    @Setter
+    public static class CorsProperties {
+
+        private boolean enabled;
+        private List<String> allowedOriginPatterns;
+        private List<String> allowedMethods;
+        private List<String> allowedHeaders;
+        private List<String> exposedHeaders;
+        private boolean allowCredentials;
     }
 }

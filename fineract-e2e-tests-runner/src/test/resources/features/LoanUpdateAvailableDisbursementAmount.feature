@@ -15,7 +15,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
     When Admin successfully disburse the loan on "01 January 2025" with "600" EUR transaction amount
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3919
   Scenario: Verify update available disbursement amount after undo disbursement for single disb progressive loan - UC3
@@ -32,7 +32,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
     When Admin successfully disburse the loan on "01 January 2025" with "700" EUR transaction amount
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3920
   Scenario: Verify update available disbursement amount with approved over applied amount for progressive multidisbursal loan with percentage overAppliedCalculationType - UC4
@@ -42,13 +42,18 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | LoanProduct                                                                                       | submitted on date | with Principal | ANNUAL interest rate % | interest type     | interest calculation period | amortization type  | loanTermFrequency | loanTermFrequencyType | repaymentEvery | repaymentFrequencyType | numberOfRepayments | graceOnPrincipalPayment | graceOnInterestPayment | interest free period | Payment strategy            |
       | LP2_ADV_PYMNT_INTEREST_DAILY_RECALC_EMI_360_30_MULTIDISB_APPROVED_OVER_APPLIED_CAPITALIZED_INCOME | 01 January 2025   | 1000           | 7                      | DECLINING_BALANCE | DAILY                       | EQUAL_INSTALLMENTS | 6                 | MONTHS                | 1              | MONTHS                 | 6                  | 0                       | 0                      | 0                    | ADVANCED_PAYMENT_ALLOCATION |
     And Admin successfully approves the loan on "1 January 2025" with "1000" amount and expected disbursement date on "1 January 2025"
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 1500
+
     And Admin successfully disburse the loan on "1 January 2025" with "900" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 600
+
     Then Update loan available disbursement amount is forbidden with amount "601" due to exceed applied amount
-    Then Update loan available disbursement amount with new amount "500" value
+    Then Update loan available disbursement amount with new amount "600" value
     And Admin successfully disburse the loan on "1 January 2025" with "600" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3921
   Scenario: Verify update available disbursement amount with approved over applied amount and capitalized income for progressive loan with percentage overAppliedCalculationType - UC8_1
@@ -58,14 +63,21 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | LoanProduct                                                                                        | submitted on date | with Principal | ANNUAL interest rate % | interest type     | interest calculation period | amortization type  | loanTermFrequency | loanTermFrequencyType | repaymentEvery | repaymentFrequencyType | numberOfRepayments | graceOnPrincipalPayment | graceOnInterestPayment | interest free period | Payment strategy            |
       | LP2_ADV_PYMNT_INTEREST_DAILY_RECALC_EMI_360_30_APPROVED_OVER_APPLIED_PERCENTAGE_CAPITALIZED_INCOME | 01 January 2025   | 1000           | 7                      | DECLINING_BALANCE | DAILY                       | EQUAL_INSTALLMENTS | 6                 | MONTHS                | 1              | MONTHS                 | 6                  | 0                       | 0                      | 0                    | ADVANCED_PAYMENT_ALLOCATION |
     And Admin successfully approves the loan on "1 January 2025" with "1000" amount and expected disbursement date on "1 January 2025"
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 1500
+
     And Admin successfully disburse the loan on "1 January 2025" with "900" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 600
+
     Then Update loan available disbursement amount is forbidden with amount "700" due to exceed applied amount
     Then Update loan available disbursement amount with new amount "500" value
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 600
+
     And Capitalized income with payment type "AUTOPAY" on "1 January 2025" is forbidden with amount "601" while exceed approved amount
     And Admin adds capitalized income with "AUTOPAY" payment type to the loan on "1 January 2025" with "600" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3922
   Scenario: Verify update available disbursement amount with capitalized income for progressive loan - UC8_2
@@ -83,7 +95,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
     And Admin adds capitalized income with "AUTOPAY" payment type to the loan on "1 January 2025" with "150" EUR transaction amount
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3923
   Scenario: Verify update available disbursement amount with capitalized income for progressive multidisbursal loan - UC8_3
@@ -101,7 +113,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
     And Admin successfully disburse the loan on "1 January 2025" with "200" EUR transaction amount
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3924
   Scenario: Verify update available disbursement amount before disbursement for single disb cumulative loan - UC5_1
@@ -116,7 +128,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
     And Admin successfully disburse the loan on "1 January 2025" with "900" EUR transaction amount
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3925
   Scenario: Verify update available disbursement amount before disbursement for single disb progressive loan - UC5_2
@@ -131,7 +143,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
     And Admin successfully disburse the loan on "1 January 2025" with "900" EUR transaction amount
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3926
   Scenario: Verify available disbursement amount change for progressive multidisbursal loan that doesn't expect tranches - UC6
@@ -160,7 +172,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
     Then Update loan available disbursement amount is forbidden with amount "500" due to exceed applied amount
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3927
   Scenario: Verify available disbursement amount change is forbidden with lower value for progressive multidisbursal loan that expects tranches - UC7_1
@@ -170,6 +182,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | LoanProduct                                                                                | submitted on date | with Principal | ANNUAL interest rate % | interest type     | interest calculation period | amortization type  | loanTermFrequency | loanTermFrequencyType | repaymentEvery | repaymentFrequencyType | numberOfRepayments | graceOnPrincipalPayment | graceOnInterestPayment | interest free period | Payment strategy            | 1st_tranche_disb_expected_date | 1st_tranche_disb_principal | 2nd_tranche_disb_expected_date | 2nd_tranche_disb_principal | 3rd_tranche_disb_expected_date | 3rd_tranche_disb_principal |
       | LP2_ADV_PYMNT_INTEREST_DAILY_EMI_360_30_INTEREST_RECALC_DAILY_MULTIDISBURSE_EXPECT_TRANCHE | 01 January 2025   | 1000           | 7                      | DECLINING_BALANCE | DAILY                       | EQUAL_INSTALLMENTS | 6                 | MONTHS                | 1              | MONTHS                 | 6                  | 0                       | 0                      | 0                    | ADVANCED_PAYMENT_ALLOCATION | 01 January 2025                | 300.0                      | 02 January 2025                | 200.0                      | 03 January 2025                | 500.0                      |
     And Admin successfully approves the loan on "01 January 2025" with "1000" amount and expected disbursement date on "01 January 2025"
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
     Then Loan Tranche Details tab has the following data:
       | Expected Disbursement On | Disbursed On    | Principal   | Net Disbursal Amount |
       | 01 January 2025          |                 | 300.0       |                      |
@@ -181,6 +194,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | Transaction date | Transaction Type | Amount  | Principal | Interest | Fees | Penalties | Loan Balance | Reverted | Replayed |
       | 01 January 2025  | Disbursement     | 300.0   | 0.0       | 0.0      | 0.0  | 0.0       | 300.0        | false    | false    |
     When Admin sets the business date to "02 January 2025"
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
     Then Update loan available disbursement amount is forbidden with amount "100" due to exceed applied amount
     When Admin sets the business date to "03 January 2025"
     Then Update loan available disbursement amount is forbidden with amount "100" due to exceed applied amount
@@ -189,6 +203,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
 
     When Admin successfully disburse the loan on "02 January 2025" with "200" EUR transaction amount
     When Admin successfully disburse the loan on "03 January 2025" with "500" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
     Then Loan Tranche Details tab has the following data:
       | Expected Disbursement On | Disbursed On    | Principal   | Net Disbursal Amount |
       | 01 January 2025          | 01 January 2025 | 300.0       |                      |
@@ -201,7 +216,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | 03 January 2025  | Disbursement     | 500.0   | 0.0       | 0.0      | 0.0  | 0.0       | 1000.0       | false    | false    |
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3928
   Scenario: Verify available disbursement amount change with greater value above approved amount for progressive multidisbursal loan that expects tranches - UC7_2
@@ -211,6 +226,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | LoanProduct                                                                                | submitted on date | with Principal | ANNUAL interest rate % | interest type     | interest calculation period | amortization type  | loanTermFrequency | loanTermFrequencyType | repaymentEvery | repaymentFrequencyType | numberOfRepayments | graceOnPrincipalPayment | graceOnInterestPayment | interest free period | Payment strategy            | 1st_tranche_disb_expected_date | 1st_tranche_disb_principal | 2nd_tranche_disb_expected_date | 2nd_tranche_disb_principal | 3rd_tranche_disb_expected_date | 3rd_tranche_disb_principal |
       | LP2_ADV_PYMNT_INTEREST_DAILY_EMI_360_30_INTEREST_RECALC_DAILY_MULTIDISBURSE_EXPECT_TRANCHE | 01 January 2025   | 1200           | 7                      | DECLINING_BALANCE | DAILY                       | EQUAL_INSTALLMENTS | 6                 | MONTHS                | 1              | MONTHS                 | 6                  | 0                       | 0                      | 0                    | ADVANCED_PAYMENT_ALLOCATION | 01 January 2025                | 300.0                      | 02 January 2025                | 200.0                      | 03 January 2025                | 500.0                      |
     And Admin successfully approves the loan on "01 January 2025" with "1000" amount and expected disbursement date on "01 January 2025"
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
     Then Loan Tranche Details tab has the following data:
       | Expected Disbursement On | Disbursed On    | Principal   | Net Disbursal Amount |
       | 01 January 2025          |                 | 300.0       |                      |
@@ -218,13 +234,16 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | 03 January 2025          |                 | 500.0       |                      |
 #    --- disbursement - 1 January, 2025  ---
     When Admin successfully disburse the loan on "01 January 2025" with "300" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
     When Admin sets the business date to "02 January 2025"
     Then Update loan available disbursement amount with new amount "200" value
-
     When Admin successfully disburse the loan on "02 January 2025" with "200" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 200
+
     When Admin sets the business date to "03 January 2025"
     Then Admin fails to disburse the loan on "03 January 2025" with "800" EUR transaction amount due to exceed approved amount
     When Admin successfully disburse the loan on "03 January 2025" with "700" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
     Then Loan Tranche Details tab has the following data:
       | Expected Disbursement On | Disbursed On    | Principal   | Net Disbursal Amount |
       | 01 January 2025          | 01 January 2025 | 300.0       |                      |
@@ -237,7 +256,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | 03 January 2025  | Disbursement     | 700.0   | 0.0       | 0.0      | 0.0  | 0.0       | 1200.0       | false    | false    |
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3929
   Scenario: Verify available disbursement amount change with greater value under approved amount for progressive multidisbursal loan that expects tranches - UC7_3
@@ -247,6 +266,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | LoanProduct                                                                                | submitted on date | with Principal | ANNUAL interest rate % | interest type     | interest calculation period | amortization type  | loanTermFrequency | loanTermFrequencyType | repaymentEvery | repaymentFrequencyType | numberOfRepayments | graceOnPrincipalPayment | graceOnInterestPayment | interest free period | Payment strategy            | 1st_tranche_disb_expected_date | 1st_tranche_disb_principal | 2nd_tranche_disb_expected_date | 2nd_tranche_disb_principal | 3rd_tranche_disb_expected_date | 3rd_tranche_disb_principal |
       | LP2_ADV_PYMNT_INTEREST_DAILY_EMI_360_30_INTEREST_RECALC_DAILY_MULTIDISBURSE_EXPECT_TRANCHE | 01 January 2025   | 1200           | 7                      | DECLINING_BALANCE | DAILY                       | EQUAL_INSTALLMENTS | 6                 | MONTHS                | 1              | MONTHS                 | 6                  | 0                       | 0                      | 0                    | ADVANCED_PAYMENT_ALLOCATION | 01 January 2025                | 300.0                      | 02 January 2025                | 200.0                      | 03 January 2025                | 300.0                      |
     And Admin successfully approves the loan on "01 January 2025" with "1000" amount and expected disbursement date on "01 January 2025"
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
     Then Loan Tranche Details tab has the following data:
       | Expected Disbursement On | Disbursed On    | Principal   | Net Disbursal Amount |
       | 01 January 2025          |                 | 300.0       |                      |
@@ -254,13 +274,15 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | 03 January 2025          |                 | 300.0       |                      |
 #    --- disbursement - 1 January, 2025  ---
     When Admin successfully disburse the loan on "01 January 2025" with "300" EUR transaction amount
+
     When Admin sets the business date to "02 January 2025"
     Then Update loan available disbursement amount by external-id with new amount "150" value
-
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 150
     When Admin successfully disburse the loan on "02 January 2025" with "300" EUR transaction amount
     When Admin sets the business date to "03 January 2025"
     Then Admin fails to disburse the loan on "03 January 2025" with "400" EUR transaction amount due to exceed approved amount
     When Admin successfully disburse the loan on "03 January 2025" with "350" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
     Then Loan Tranche Details tab has the following data:
       | Expected Disbursement On | Disbursed On    | Principal   | Net Disbursal Amount |
       | 01 January 2025          | 01 January 2025 | 300.0       |                      |
@@ -273,7 +295,7 @@ Feature: LoanUpdateAvailableDisbursementAmount
       | 03 January 2025  | Disbursement     | 350.0   | 0.0       | 0.0      | 0.0  | 0.0       | 950.0        | false    | false    |
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
 
   @TestRailId:C3995
   Scenario: Verify update available disbursement amount to zero is forbidden for not approved loan
@@ -344,4 +366,70 @@ Feature: LoanUpdateAvailableDisbursementAmount
     Then Admin fails to disburse the loan on "1 January 2025" with "1" EUR transaction amount due to exceed approved amount
 
     When Loan Pay-off is made on "01 January 2025"
-    Then Loan's all installments have obligations met
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
+
+  @TestRailId:C3999
+  Scenario: Verify availableDisbursementAmountWithOverApplied field calculation
+    When Admin sets the business date to "1 January 2025"
+    And Admin creates a client with random data
+    And Admin creates a fully customized loan with the following data:
+      | LoanProduct                                                                                       | submitted on date | with Principal | ANNUAL interest rate % | interest type     | interest calculation period | amortization type  | loanTermFrequency | loanTermFrequencyType | repaymentEvery | repaymentFrequencyType | numberOfRepayments | graceOnPrincipalPayment | graceOnInterestPayment | interest free period | Payment strategy            |
+      | LP2_ADV_PYMNT_INTEREST_DAILY_RECALC_EMI_360_30_MULTIDISB_APPROVED_OVER_APPLIED_CAPITALIZED_INCOME | 01 January 2025   | 1000           | 7                      | DECLINING_BALANCE | DAILY                       | EQUAL_INSTALLMENTS | 6                 | MONTHS                | 1              | MONTHS                 | 6                  | 0                       | 0                      | 0                    | ADVANCED_PAYMENT_ALLOCATION |
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 1500
+    And Admin successfully approves the loan on "1 January 2025" with "1000" amount and expected disbursement date on "1 January 2025"
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 1500
+    And Admin successfully disburse the loan on "1 January 2025" with "900" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 600
+    And Admin successfully disburse the loan on "1 January 2025" with "300" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 300
+    And Admin adds capitalized income with "AUTOPAY" payment type to the loan on "1 January 2025" with "100" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 200
+    And Admin adds capitalized income with "AUTOPAY" payment type to the loan on "1 January 2025" with "150" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 50
+    When Loan Pay-off is made on "01 January 2025"
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met
+
+  @TestRailId:C4003
+  Scenario: Verify availableDisbursementAmountWithOverApplied field calculation for progressive multidisbursal loan that expects tranches
+    When Admin sets the business date to "01 January 2025"
+    When Admin creates a client with random data
+    When Admin creates a fully customized loan with three expected disbursements details and following data:
+      | LoanProduct                                                                                        | submitted on date | with Principal | ANNUAL interest rate % | interest type     | interest calculation period | amortization type  | loanTermFrequency | loanTermFrequencyType | repaymentEvery | repaymentFrequencyType | numberOfRepayments | graceOnPrincipalPayment | graceOnInterestPayment | interest free period | Payment strategy            | 1st_tranche_disb_expected_date | 1st_tranche_disb_principal | 2nd_tranche_disb_expected_date | 2nd_tranche_disb_principal | 3rd_tranche_disb_expected_date | 3rd_tranche_disb_principal |
+      | LP2_ADV_PYMNT_INT_DAILY_EMI_360_30_INT_RECALC_DAILY_MULTIDISB_EXPECT_TRANCHE_APPROVED_OVER_APPLIED | 01 January 2025   | 1000           | 7                      | DECLINING_BALANCE | DAILY                       | EQUAL_INSTALLMENTS | 6                 | MONTHS                | 1              | MONTHS                 | 6                  | 0                       | 0                      | 0                    | ADVANCED_PAYMENT_ALLOCATION | 01 January 2025                | 300.0                      | 02 January 2025                | 200.0                      | 03 January 2025                | 500.0                      |
+    Then Loan Tranche Details tab has the following data:
+      | Expected Disbursement On | Disbursed On    | Principal   | Net Disbursal Amount |
+      | 01 January 2025          |                 | 300.0       |                      |
+      | 02 January 2025          |                 | 200.0       |                      |
+      | 03 January 2025          |                 | 500.0       |                      |
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 500
+    And Admin successfully approves the loan on "01 January 2025" with "1000" amount and expected disbursement date on "01 January 2025"
+    Then Loan Tranche Details tab has the following data:
+      | Expected Disbursement On | Disbursed On    | Principal   | Net Disbursal Amount |
+      | 01 January 2025          |                 | 300.0       |                      |
+      | 02 January 2025          |                 | 200.0       |                      |
+      | 03 January 2025          |                 | 500.0       |                      |
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 500
+    When Admin successfully disburse the loan on "01 January 2025" with "300" EUR transaction amount
+    And Loan Transactions tab has the following data:
+      | Transaction date | Transaction Type | Amount  | Principal | Interest | Fees | Penalties | Loan Balance | Reverted | Replayed |
+      | 01 January 2025  | Disbursement     | 300.0   | 0.0       | 0.0      | 0.0  | 0.0       | 300.0        | false    | false    |
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 500
+    When Admin sets the business date to "02 January 2025"
+    When Admin successfully disburse the loan on "02 January 2025" with "200" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 500
+    When Admin sets the business date to "03 January 2025"
+    When Admin successfully disburse the loan on "03 January 2025" with "1000" EUR transaction amount
+    Then Loan has availableDisbursementAmountWithOverApplied field with value: 0
+    Then Loan Tranche Details tab has the following data:
+      | Expected Disbursement On | Disbursed On    | Principal   | Net Disbursal Amount |
+      | 01 January 2025          | 01 January 2025 | 300.0       |                      |
+      | 02 January 2025          | 02 January 2025 | 200.0       |                      |
+      | 03 January 2025          | 03 January 2025 | 1000.0      |                      |
+    And Loan Transactions tab has the following data:
+      | Transaction date | Transaction Type | Amount  | Principal | Interest | Fees | Penalties | Loan Balance | Reverted | Replayed |
+      | 01 January 2025  | Disbursement     | 300.0   | 0.0       | 0.0      | 0.0  | 0.0       | 300.0        | false    | false    |
+      | 02 January 2025  | Disbursement     | 200.0   | 0.0       | 0.0      | 0.0  | 0.0       | 500.0        | false    | false    |
+      | 03 January 2025  | Disbursement     | 1000.0  | 0.0       | 0.0      | 0.0  | 0.0       | 1500.0       | false    | false    |
+
+    When Loan Pay-off is made on "03 January 2025"
+    Then Loan is closed with zero outstanding balance and it's all installments have obligations met

@@ -44,14 +44,17 @@ import org.apache.fineract.integrationtests.common.Utils;
 import org.apache.fineract.integrationtests.common.savings.SavingsAccountHelper;
 import org.apache.fineract.integrationtests.common.savings.SavingsProductHelper;
 import org.apache.fineract.integrationtests.common.savings.SavingsStatusChecker;
+import org.apache.fineract.integrationtests.common.savings.SavingsTestLifecycleExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @SuppressWarnings({ "rawtypes", "unused", "unchecked" })
+@ExtendWith({ SavingsTestLifecycleExtension.class })
 public class SavingsInterestPostingIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(SavingsInterestPostingIntegrationTest.class);
@@ -98,7 +101,7 @@ public class SavingsInterestPostingIntegrationTest {
             ArrayList<HashMap<String, Object>> transactions = (ArrayList<HashMap<String, Object>>) accountDetails.get("transactions");
             HashMap<String, Object> interestPostingTransaction = transactions.get(transactions.size() - 2);
             for (Map.Entry<String, Object> entry : interestPostingTransaction.entrySet()) {
-                LOG.info("{} - {}", entry.getKey(), entry.getValue().toString());
+                LOG.info("{} - {}", entry.getKey(), String.valueOf(entry.getValue()));
             }
             assertEquals("0.274", interestPostingTransaction.get("amount").toString(), "Equality check for interest posted amount");
             assertEquals("[2021, 11, 2]", interestPostingTransaction.get("date").toString(), "Date check for Interest Posting transaction");

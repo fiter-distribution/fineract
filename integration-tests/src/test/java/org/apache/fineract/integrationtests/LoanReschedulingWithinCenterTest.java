@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -85,7 +86,7 @@ public class LoanReschedulingWithinCenterTest extends BaseLoanIntegrationTest {
     @Test
     public void testCenterReschedulingLoansWithInterestRecalculationEnabled() {
 
-        Integer officeId = new OfficeHelper(requestSpec, responseSpec).createOffice("01 July 2007");
+        Integer officeId = new OfficeHelper().createOffice(LocalDate.of(2007, 7, 1)).getResourceId().intValue();
         String name = "TestFullCreation" + new Timestamp(new java.util.Date().getTime());
         String externalId = UUID.randomUUID().toString();
         int staffId = StaffHelper.createStaff(requestSpec, responseSpec);
@@ -218,7 +219,7 @@ public class LoanReschedulingWithinCenterTest extends BaseLoanIntegrationTest {
     @Test
     public void testCenterReschedulingMultiTrancheLoansWithInterestRecalculationEnabled() {
 
-        Integer officeId = new OfficeHelper(requestSpec, responseSpec).createOffice("01 July 2007");
+        Integer officeId = new OfficeHelper().createOffice(LocalDate.of(2007, 7, 1)).getResourceId().intValue();
         String name = "TestFullCreation" + new Timestamp(new java.util.Date().getTime());
         String externalId = UUID.randomUUID().toString();
         int staffId = StaffHelper.createStaff(requestSpec, responseSpec);
@@ -312,11 +313,11 @@ public class LoanReschedulingWithinCenterTest extends BaseLoanIntegrationTest {
 
         ArrayList loanRepaymnetSchedule = this.loanTransactionHelper.getLoanRepaymentSchedule(requestSpec, generalResponseSpec, loanID);
         // VERIFY RESCHEDULED DATE
-        ArrayList dueDateLoanSchedule = (ArrayList) ((HashMap) loanRepaymnetSchedule.get(2)).get("dueDate");
+        ArrayList dueDateLoanSchedule = (ArrayList) ((HashMap) loanRepaymnetSchedule.get(3)).get("dueDate");
         assertEquals(getDateAsArray(todaysdate, 0), dueDateLoanSchedule);
 
         // VERIFY THE INTEREST
-        Float interestDue = (Float) ((HashMap) loanRepaymnetSchedule.get(2)).get("interestDue");
+        Float interestDue = (Float) ((HashMap) loanRepaymnetSchedule.get(3)).get("interestDue");
         assertEquals("41.05", String.valueOf(interestDue));
 
         // DISBURSE THE SECOND TRANCHE (for let the loan test lifecycle callback to close the loan

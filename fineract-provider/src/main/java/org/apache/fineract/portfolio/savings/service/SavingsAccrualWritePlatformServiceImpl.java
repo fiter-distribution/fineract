@@ -37,6 +37,7 @@ import org.apache.fineract.infrastructure.jobs.exception.JobExecutionException;
 import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
 import org.apache.fineract.organisation.monetary.domain.Money;
 import org.apache.fineract.organisation.monetary.domain.MoneyHelper;
+import org.apache.fineract.portfolio.savings.DepositAccountType;
 import org.apache.fineract.portfolio.savings.SavingsCompoundingInterestPeriodType;
 import org.apache.fineract.portfolio.savings.SavingsInterestCalculationDaysInYearType;
 import org.apache.fineract.portfolio.savings.SavingsInterestCalculationType;
@@ -77,7 +78,7 @@ public class SavingsAccrualWritePlatformServiceImpl implements SavingsAccrualWri
         List<Throwable> errors = new ArrayList<>();
         for (SavingsAccrualData savingsAccrual : savingsAccrualData) {
             try {
-                if (savingsAccrual.getDepositType().isSavingsDeposit() && savingsAccrual.getIsAllowOverdraft()) {
+                if (savingsAccrual.getDepositType() == DepositAccountType.SAVINGS_DEPOSIT && savingsAccrual.getIsAllowOverdraft()) {
                     if (!savingsAccrual.getIsTypeInterestReceivable()) {
                         continue;
                     }
@@ -158,19 +159,29 @@ public class SavingsAccrualWritePlatformServiceImpl implements SavingsAccrualWri
 
         final List<LocalDate> accrualTransactionDates = savingsAccount.retrieveOrderedAccrualTransactions().stream()
                 .map(transaction -> transaction.getTransactionDate()).toList();
+        final List<LocalDate> reversedAccrualTransactionDates = savingsAccount.retrieveOrderedAccrualTransactions().stream()
+                .filter(transaction -> transaction.isReversed()).map(transaction -> transaction.getTransactionDate()).toList();
+
         LocalDate accruedTillDate = fromDate;
 
         for (PostingPeriod period : allPostingPeriods) {
+            LocalDate valueDate = period.getPeriodInterval().endDate();
+            List<LocalDate> matchingAccrualDates = accrualTransactionDates.stream().filter(accrualDate -> accrualDate.equals(valueDate))
+                    .toList();
+            List<LocalDate> matchingAccrualReverseDates = reversedAccrualTransactionDates.stream()
+                    .filter(accrualDate -> accrualDate.equals(valueDate)).toList();
             period.calculateInterest(compoundInterestValues);
             final LocalDate endDate = period.getPeriodInterval().endDate();
             if (!accrualTransactionDates.contains(period.getPeriodInterval().endDate())
-                    && !MathUtil.isZero(period.closingBalance().getAmount())) {
+                    || (!matchingAccrualReverseDates.isEmpty() && matchingAccrualDates.size() == matchingAccrualReverseDates.size())) {
                 String refNo = (refNoProvider != null) ? refNoProvider.apply(endDate) : null;
                 SavingsAccountTransaction savingsAccountTransaction = SavingsAccountTransaction.accrual(savingsAccount,
                         savingsAccount.office(), period.getPeriodInterval().endDate(), period.getInterestEarned().abs(), false, refNo);
                 savingsAccountTransaction.setRunningBalance(period.getClosingBalance());
                 savingsAccountTransaction.setOverdraftAmount(period.getInterestEarned());
-                savingsAccount.addTransaction(savingsAccountTransaction);
+                if (!MathUtil.isZero(savingsAccountTransaction.getAmount())) {
+                    savingsAccount.addTransaction(savingsAccountTransaction);
+                }
             }
         }
 

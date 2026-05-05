@@ -46,13 +46,14 @@ import org.apache.fineract.portfolio.charge.domain.ChargeTimeType;
 import org.apache.fineract.portfolio.loanaccount.serialization.LoanChargeValidator;
 import org.apache.fineract.portfolio.loanaccount.service.LoanBalanceService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanChargeService;
+import org.apache.fineract.portfolio.loanaccount.service.LoanScheduleGeneratorService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanTransactionProcessingService;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
+import org.springframework.lang.NonNull;
 
 public class SingleLoanChargeRepaymentScheduleProcessingWrapperTest {
 
@@ -69,7 +70,8 @@ public class SingleLoanChargeRepaymentScheduleProcessingWrapperTest {
     private ArgumentCaptor<Money> penaltyChargesWrittenOff = ArgumentCaptor.forClass(Money.class);
 
     private final LoanChargeService loanChargeService = new LoanChargeService(mock(LoanChargeValidator.class),
-            mock(LoanTransactionProcessingService.class), mock(LoanLifecycleStateMachine.class), mock(LoanBalanceService.class));
+            mock(LoanTransactionProcessingService.class), mock(LoanLifecycleStateMachine.class), mock(LoanBalanceService.class),
+            mock(LoanScheduleGeneratorService.class));
 
     @BeforeAll
     public static void init() {
@@ -139,7 +141,7 @@ public class SingleLoanChargeRepaymentScheduleProcessingWrapperTest {
                 penaltyChargesWrittenOff.getValue().getAmount().setScale(1, RoundingMode.UNNECESSARY));
     }
 
-    @NotNull
+    @NonNull
     private LoanCharge createCharge(boolean penalty) {
         Charge charge = mock(Charge.class);
         when(charge.getId()).thenReturn(1L);
@@ -153,7 +155,7 @@ public class SingleLoanChargeRepaymentScheduleProcessingWrapperTest {
                 ChargeCalculationType.FLAT, LocalDate.of(2023, 1, 15), ChargePaymentMode.REGULAR, 1, null, null);
     }
 
-    @NotNull
+    @NonNull
     private LoanRepaymentScheduleInstallment createPeriod(int periodId, LocalDate start, LocalDate end) {
         LoanRepaymentScheduleInstallment period = mock(LoanRepaymentScheduleInstallment.class);
         MathContext mc = new MathContext(12, RoundingMode.HALF_EVEN);
