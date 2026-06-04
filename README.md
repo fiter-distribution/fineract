@@ -44,6 +44,11 @@ If you believe you have found a new vulnerability, [let us know privately](https
 
 For details about security during development and deployment, see the documentation [here](https://fineract.apache.org/docs/current/#_security).
 
+PRIVATE FORKS
+============
+
+If you’re running Apache Fineract on a private fork, you might want to consider **disabling GitHub Actions CI**. 
+This is because the usage minutes and artifact costs (including the built workspace and logs generated during execution) could incur additional expenses, that you should be aware!
 
 INSTRUCTIONS
 ============
@@ -155,7 +160,7 @@ We recommend using the JAR instead of the WAR file deployment, because it's much
 How to run using Docker or Podman
 ---
 
-It is possible to do a 'one-touch' installation of Fineract using containers (AKA "Docker").
+It is possible to do a 'one-touch' installation of Fineract using containers (AKA "Docker") for dev/test convenience and local/offline demos.
 This includes the database running in the container.
 
 As prerequisites, you must have `docker` and `docker-compose` installed on your machine; see
@@ -164,6 +169,9 @@ As prerequisites, you must have `docker` and `docker-compose` installed on your 
 Alternatively, you can also use [Podman](https://github.com/containers/libpod)
 (e.g. via `dnf install podman-docker`), and [Podman Compose](https://github.com/containers/podman-compose/)
 (e.g. via `pip3 install podman-compose`) instead of Docker.
+
+> [!CAUTION]
+> Our images are NOT production-ready. For example, notice how the `test` Spring profile is enabled via `fineract-common.env`, included by `docker-compose.yml`, but `test` must not be enabled in production. YOU are responsible for securing your production instances. See [How to run for production](#how-to-run-for-production).
 
 To run a new Fineract instance on Linux you can simply:
 ```bash

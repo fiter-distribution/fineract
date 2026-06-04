@@ -30,6 +30,9 @@ import lombok.RequiredArgsConstructor;
 import org.apache.fineract.cob.COBBusinessStepService;
 import org.apache.fineract.cob.common.CustomJobParameterResolver;
 import org.apache.fineract.cob.conditions.BatchManagerCondition;
+import org.apache.fineract.cob.domain.WorkingCapitalLoanAccountLock;
+import org.apache.fineract.cob.listener.COBExecutionListenerRunner;
+import org.apache.fineract.cob.service.AccountLockService;
 import org.apache.fineract.infrastructure.springbatch.PropertyService;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -44,6 +47,7 @@ import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.integration.config.annotation.EnableBatchIntegration;
 import org.springframework.batch.integration.partition.RemotePartitioningManagerStepBuilderFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
@@ -57,18 +61,15 @@ import org.springframework.transaction.PlatformTransactionManager;
 public class WorkingCapitalLoanCOBManagerConfiguration {
 
     private final JobRepository jobRepository;
-
     private final CustomJobParameterResolver customJobParameterResolver;
-
     private final PlatformTransactionManager transactionManager;
     private final RemotePartitioningManagerStepBuilderFactory stepBuilderFactory;
     private final COBBusinessStepService cobBusinessStepService;
     private final JobOperator jobOperator;
-    private final DirectChannel inboundRequests;
-
     private final DirectChannel outboundRequests;
     private final PropertyService propertyService;
     private final WorkingCapitalLoanRetrieveIdService retrieveIdService;
+    private final AccountLockService<WorkingCapitalLoanAccountLock> accountLockService;
 
     @Bean(WORKING_CAPITAL_LOAN_COB_PARTITIONER)
     @StepScope
@@ -79,11 +80,25 @@ public class WorkingCapitalLoanCOBManagerConfiguration {
 
     @Bean(WORKING_CAPITAL_JOB_HUMAN_READABLE_NAME)
     public Job workingCapitalLoanCOBJob(WorkingCapitalLoanCOBPartitioner workingCapitalLoanCOBPartitioner,
-            ExecutionContextPromotionListener customJobParametersPromotionListener) {
-        return new JobBuilder(WORKING_CAPITAL_LOAN_COB_JOB.name(), jobRepository)
-                .start(resolveCustomJobParametersForWorkingCapitalStep(customJobParametersPromotionListener))
-                .next(workingCapitalLoanCOBStep(workingCapitalLoanCOBPartitioner)).incrementer(new RunIdIncrementer()) //
+            ExecutionContextPromotionListener customJobParametersPromotionListener, ApplicationContext applicationContext) {
+        return new JobBuilder(WORKING_CAPITAL_LOAN_COB_JOB.name(), jobRepository) //
+                .listener(new COBExecutionListenerRunner(applicationContext, WORKING_CAPITAL_LOAN_COB_JOB.name())) //
+                .start(resolveCustomJobParametersForWorkingCapitalStep(customJobParametersPromotionListener)) //
+                .next(workingCapitalLoanCOBStep(workingCapitalLoanCOBPartitioner)) //
+                .next(unlockProcessedWorkingCapitalLoansStep()) //
+                .incrementer(new RunIdIncrementer()) //
                 .build();
+    }
+
+    @Bean
+    public Step unlockProcessedWorkingCapitalLoansStep() {
+        return new StepBuilder("Unlock processed working capital loan accounts - Step", jobRepository)
+                .tasklet(unlockProcessedWorkingCapitalLoansTasklet(), transactionManager).build();
+    }
+
+    @Bean
+    public UnlockProcessedWorkingCapitalLoansTasklet unlockProcessedWorkingCapitalLoansTasklet() {
+        return new UnlockProcessedWorkingCapitalLoansTasklet(accountLockService);
     }
 
     @Bean
