@@ -84,7 +84,12 @@ resolve {
     outputFileName = 'fineract'
     outputFormat = 'JSONANDYAML'
     prettyPrint = false
-    classpath = sourceSets.main.runtimeClasspath
+    // Use compileClasspath instead of runtimeClasspath: it excludes `runtimeOnly` deps
+    // (which is where the custom acme modules live). Pulling them into `resolve` would
+    // create a project cycle (resolve -> custom:* -> fineract-provider:jar -> resolve).
+    // The OpenAPI generator only needs the API-defining classes, all of which are on the
+    // compile classpath. Custom modules document their own endpoints separately.
+    classpath = sourceSets.main.output + sourceSets.main.compileClasspath
     buildClasspath = classpath
     outputDir = file("${buildDir}/resources/main/static")
     openApiFile = file("${buildDir}/tmp/swagger/fineract-input.yaml")
@@ -265,6 +270,18 @@ tasks.named('licenseMain') {
     dependsOn(processResources, generateGitProperties)
     mustRunAfter(processResources, generateGitProperties)
     source = sourceSets.main.java.srcDirs
+}
+
+// Custom modules added as runtimeOnly so they're on the runtime classpath of both
+// `./gradlew :fineract-provider:bootRun` AND IDE-launched runs (IntelliJ "Run", VS Code,
+// etc.). `runtimeOnly` keeps them off the compile classpath, which avoids the project
+// dependency cycle (custom modules already compile-depend on fineract-provider).
+// transitive=false: theme:service's implementation deps include fineract-provider; without
+// this, fineract-provider would be on the runtime classpath twice (own source + jar via
+// transitive), causing Liquibase to find db.changelog-master.xml duplicated.
+dependencies {
+    runtimeOnly(project(':custom:acme:theme:starter')) { transitive = false }
+    runtimeOnly(project(':custom:acme:theme:service')) { transitive = false }
 }
 
 bootRun {

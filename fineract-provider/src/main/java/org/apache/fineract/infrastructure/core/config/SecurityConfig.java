@@ -137,6 +137,10 @@ public class SecurityConfig {
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.POST, "/api/*/authentication")).permitAll()
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.POST, "/api/*/password/forgot")).permitAll()
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.PUT, "/api/*/instance-mode")).permitAll()
+                    // Theme branding assets (logos, favicons) are inherently public — the login page
+                    // must be able to render the tenant logo before any user has authenticated.
+                    // Uploads still require CREATE_THEMEASSET, only the GET (download) is public.
+                    .requestMatchers(API_MATCHER.matcher(HttpMethod.GET, "/api/*/themes/assets/*")).permitAll()
                     // businessdate
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.GET, "/api/*/businessdate/*"))
                     .hasAnyAuthority(ALL_FUNCTIONS, ALL_FUNCTIONS_READ, "READ_BUSINESS_DATE")

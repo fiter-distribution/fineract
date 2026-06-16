@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements. See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership. The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License. You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied. See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.1.xsd">
+
+    <!--
+        After the refactor the entity names exposed to the command framework changed from the
+        generic "THEME" to the more specific "USERTHEMEPREFERENCE" / "ADMINTHEMECONFIG". Drop
+        the obsolete THEME permissions and seed the new ones so the existing changelog history
+        stays intact.
+    -->
+
+    <changeSet author="acme" id="acme_theme_perm_drop_obsolete">
+        <delete tableName="m_permission">
+            <where>code in ('READ_THEME','UPDATE_THEME')</where>
+        </delete>
+    </changeSet>
+
+    <changeSet author="acme" id="acme_theme_perm_user_pref">
+        <insert tableName="m_permission">
+            <column name="grouping" value="configuration"/>
+            <column name="code" value="READ_USERTHEMEPREFERENCE"/>
+            <column name="entity_name" value="USERTHEMEPREFERENCE"/>
+            <column name="action_name" value="READ"/>
+            <column name="can_maker_checker" valueBoolean="false"/>
+        </insert>
+        <insert tableName="m_permission">
+            <column name="grouping" value="configuration"/>
+            <column name="code" value="UPDATE_USERTHEMEPREFERENCE"/>
+            <column name="entity_name" value="USERTHEMEPREFERENCE"/>
+            <column name="action_name" value="UPDATE"/>
+            <column name="can_maker_checker" valueBoolean="false"/>
+        </insert>
+    </changeSet>
+
+    <changeSet author="acme" id="acme_theme_perm_admin_config">
+        <insert tableName="m_permission">
+            <column name="grouping" value="configuration"/>
+            <column name="code" value="READ_ADMINTHEMECONFIG"/>
+            <column name="entity_name" value="ADMINTHEMECONFIG"/>
+            <column name="action_name" value="READ"/>
+            <column name="can_maker_checker" valueBoolean="false"/>
+        </insert>
+        <insert tableName="m_permission">
+            <column name="grouping" value="configuration"/>
+            <column name="code" value="UPDATE_ADMINTHEMECONFIG"/>
+            <column name="entity_name" value="ADMINTHEMECONFIG"/>
+            <column name="action_name" value="UPDATE"/>
+            <column name="can_maker_checker" valueBoolean="false"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>
