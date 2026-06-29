@@ -183,15 +183,74 @@ public class ImagesApiResource {
 
         requireNonNull(body, "Missing input stream");
 
+        // Parse the data URL header to extract content type before passing to the async pipeline
+        final var bufferedBody = new java.io.BufferedInputStream(body, 256);
+        final String dataUrlContentType = parseDataUrlContentType(bufferedBody);
+        final String fileName = resolveFileNameFromContentType(dataUrlContentType);
+
         final var command = new ImageCreateCommand();
 
-        var ctx = dataUrlDecoderContentProcessor.then(base64DecoderContentProcessor).process(new ContentProcessorContext(body));
+        var ctx = dataUrlDecoderContentProcessor.then(base64DecoderContentProcessor).process(new ContentProcessorContext(bufferedBody));
 
-        command.setPayload(ImageCreateRequest.builder().entityId(entityId).entityType(entityType).stream(ctx.getInputStream()).build());
+        command.setPayload(ImageCreateRequest.builder().entityId(entityId).entityType(entityType).fileName(fileName)
+                .type(dataUrlContentType).stream(ctx.getInputStream()).build());
 
         final Supplier<ImageCreateResponse> response = dispatcher.dispatch(command);
 
         return response.get();
+    }
+
+    /**
+     * Parses the content type from a data URL header without consuming the stream. The data URL format is:
+     * {@code data:[<mediatype>][;base64],<data>}. This method reads the header, extracts the media type, then resets
+     * the stream.
+     */
+    private String parseDataUrlContentType(final java.io.BufferedInputStream stream) {
+        try {
+            stream.mark(256);
+            final var headerBuffer = new StringBuilder(64);
+            int b;
+            int count = 0;
+            while ((b = stream.read()) != -1 && count < 256) {
+                count++;
+                if (b == ',') {
+                    break;
+                }
+                headerBuffer.append((char) b);
+            }
+            stream.reset();
+
+            // Parse: "data:<mediatype>;base64" or "data:<mediatype>"
+            String header = headerBuffer.toString();
+            if (header.startsWith("data:")) {
+                header = header.substring(5);
+                int semicolonIdx = header.indexOf(';');
+                if (semicolonIdx > 0) {
+                    return header.substring(0, semicolonIdx);
+                }
+                return header.isEmpty() ? null : header;
+            }
+        } catch (Exception e) {
+            log.warn("Could not parse data URL content type, using default", e);
+            try {
+                stream.reset();
+            } catch (Exception ignored) {
+                // ignore reset failure
+            }
+        }
+        return null;
+    }
+
+    private String resolveFileNameFromContentType(final String contentType) {
+        if (StringUtils.isNotEmpty(contentType)) {
+            if (contentType.toLowerCase().contains("png")) {
+                return java.util.UUID.randomUUID() + ".png";
+            } else if (contentType.toLowerCase().contains("gif")) {
+                return java.util.UUID.randomUUID() + ".gif";
+            }
+        }
+        // Default to JPEG
+        return java.util.UUID.randomUUID() + ".jpg";
     }
 
     @PUT
