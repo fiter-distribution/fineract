@@ -25,5 +25,6 @@ package com.acme.fineract.portfolio.theme.data;
  */
 public record UserThemePreferenceData(Long userId, String skinId, String mode, boolean useSystemMode, Overrides overrides) {
 
-    public record Overrides(String fontSize, boolean reducedMotion, boolean highContrast) {}
+    public record Overrides(String fontSize, boolean reducedMotion, boolean highContrast) {
+    }
 }

@@ -21,10 +21,10 @@ package com.acme.fineract.portfolio.theme.data;
 import com.google.gson.JsonElement;
 
 /**
- * Uses Gson {@link JsonElement} (not Jackson {@code JsonNode}) for the branding payload because
- * Fineract's {@code DefaultToApiJsonSerializer} runs on Gson — handing it a Jackson tree node
- * causes Gson to reflect over JsonNode's private fields and emit an unusable
- * {@code {_children, _nodeFactory, _value}} structure.
+ * Uses Gson {@link JsonElement} (not Jackson {@code JsonNode}) for the branding payload because Fineract's
+ * {@code DefaultToApiJsonSerializer} runs on Gson — handing it a Jackson tree node causes Gson to reflect over
+ * JsonNode's private fields and emit an unusable {@code {_children, _nodeFactory, _value}} structure.
  */
 public record AdminThemeConfigData(String defaultSkinId, String defaultMode, boolean allowUserThemeChange, boolean allowUserModeChange,
-        JsonElement globalBranding) {}
+        JsonElement globalBranding) {
+}

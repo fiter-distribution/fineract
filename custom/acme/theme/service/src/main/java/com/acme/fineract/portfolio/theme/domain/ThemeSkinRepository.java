@@ -22,6 +22,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ThemeSkinRepository extends JpaRepository<ThemeSkin, Long> {
+
     Optional<ThemeSkin> findBySkinKey(String skinKey);
 
     boolean existsBySkinKey(String skinKey);

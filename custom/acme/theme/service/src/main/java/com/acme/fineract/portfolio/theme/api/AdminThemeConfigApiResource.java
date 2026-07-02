@@ -60,8 +60,7 @@ public class AdminThemeConfigApiResource {
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @Operation(summary = "Update tenant theme configuration",
-            description = "Requires the `UPDATE_ADMINTHEMECONFIG` permission.")
+    @Operation(summary = "Update tenant theme configuration", description = "Requires the `UPDATE_ADMINTHEMECONFIG` permission.")
     public String update(final String apiRequestBodyAsJson) {
         final CommandWrapper commandRequest = new ThemeCommandWrapperBuilder().updateAdminThemeConfig().withJson(apiRequestBodyAsJson)
                 .build();

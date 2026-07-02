@@ -22,8 +22,8 @@ import java.util.Set;
 
 /**
  * Central registry of resource names, permission codes and JSON parameter names for the theme module. Mirrors the
- * {@code RESOURCE_NAME_FOR_PERMISSIONS} / parameter constant convention used in Fineract's
- * {@code CodesApiResource}, {@code GlobalConfigurationApiResource}, etc.
+ * {@code RESOURCE_NAME_FOR_PERMISSIONS} / parameter constant convention used in Fineract's {@code CodesApiResource},
+ * {@code GlobalConfigurationApiResource}, etc.
  */
 public final class ThemeApiConstants {
 

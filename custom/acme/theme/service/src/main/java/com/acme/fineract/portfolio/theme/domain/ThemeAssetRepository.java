@@ -22,5 +22,6 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ThemeAssetRepository extends JpaRepository<ThemeAsset, Long> {
+
     Optional<ThemeAsset> findByAssetKey(String assetKey);
 }

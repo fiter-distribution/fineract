@@ -18,6 +18,8 @@
  */
 package org.apache.fineract.portfolio.account.data;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.MonthDay;
@@ -40,6 +42,7 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionType;
  * Immutable data object representing a savings account.
  */
 @SuppressWarnings("unused")
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 public final class StandingInstructionData {
 
     @Getter
@@ -51,17 +54,21 @@ public final class StandingInstructionData {
     private final OfficeData fromOffice;
     @Getter
     private final ClientData fromClient;
+    @JsonProperty("fromAccountType")
     private final EnumOptionData fromAccountType;
     @Getter
     private final PortfolioAccountData fromAccount;
     private final OfficeData toOffice;
     @Getter
     private final ClientData toClient;
+    @JsonProperty("toAccountType")
     private final EnumOptionData toAccountType;
     @Getter
     private final PortfolioAccountData toAccount;
+    @JsonProperty("transferType")
     private final EnumOptionData transferType;
     private final EnumOptionData priority;
+    @JsonProperty("instructionType")
     private final EnumOptionData instructionType;
     @Getter
     private final EnumOptionData status;
@@ -70,7 +77,9 @@ public final class StandingInstructionData {
     @Getter
     private final LocalDate validFrom;
     private final LocalDate validTill;
+    @JsonProperty("recurrenceType")
     private final EnumOptionData recurrenceType;
+    @JsonProperty("recurrenceFrequency")
     private final EnumOptionData recurrenceFrequency;
     @Getter
     private final Integer recurrenceInterval;
@@ -251,7 +260,7 @@ public final class StandingInstructionData {
         final EnumOptionData instructionType = null;
         final EnumOptionData status = null;
         final BigDecimal amount = null;
-        final LocalDate validFrom = null;
+        final LocalDate validFrom = transferDate;
         final LocalDate validTill = null;
         final EnumOptionData recurrenceType = null;
         final EnumOptionData recurrenceFrequency = null;
@@ -282,27 +291,33 @@ public final class StandingInstructionData {
                 instructionData.recurrenceTypeOptions, instructionData.recurrenceFrequencyOptions);
     }
 
+    @JsonProperty("instructionTypeEnum")
     public StandingInstructionType getInstructionType() {
         return Optional.ofNullable(this.instructionType).map(e -> StandingInstructionType.fromInt(e.getId().intValue())).orElse(null);
 
     }
 
+    @JsonProperty("recurrenceTypeEnum")
     public AccountTransferRecurrenceType getRecurrenceType() {
         return Optional.ofNullable(this.recurrenceType).map(e -> AccountTransferRecurrenceType.fromInt(e.getId().intValue())).orElse(null);
     }
 
+    @JsonProperty("recurrenceFrequencyEnum")
     public PeriodFrequencyType getRecurrenceFrequency() {
         return Optional.ofNullable(this.recurrenceFrequency).map(e -> PeriodFrequencyType.fromInt(e.getId().intValue())).orElse(null);
     }
 
+    @JsonProperty("fromAccountTypeEnum")
     public PortfolioAccountType getFromAccountType() {
         return Optional.ofNullable(this.fromAccountType).map(e -> PortfolioAccountType.fromInt(e.getId().intValue())).orElse(null);
     }
 
+    @JsonProperty("toAccountTypeEnum")
     public PortfolioAccountType getToAccountType() {
         return Optional.ofNullable(this.toAccountType).map(e -> PortfolioAccountType.fromInt(e.getId().intValue())).orElse(null);
     }
 
+    @JsonProperty("transferTypeEnum")
     public AccountTransferType getTransferType() {
         return Optional.ofNullable(this.transferType).map(e -> AccountTransferType.fromInt(e.getId().intValue())).orElse(null);
     }

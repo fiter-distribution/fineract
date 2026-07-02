@@ -113,10 +113,9 @@ public class ThemeReadPlatformServiceImpl implements ThemeReadPlatformService {
     }
 
     /**
-     * Bridge Jackson {@link JsonNode} (used for JPA persistence via the custom
-     * {@code JsonNodeAttributeConverter}) to Gson {@link JsonElement} (consumed by Fineract's
-     * {@code DefaultToApiJsonSerializer}). Without this bridge Gson reflects over JsonNode's
-     * private fields and emits a {@code {_children, _nodeFactory, _value}} mess on the wire.
+     * Bridge Jackson {@link JsonNode} (used for JPA persistence via the custom {@code JsonNodeAttributeConverter}) to
+     * Gson {@link JsonElement} (consumed by Fineract's {@code DefaultToApiJsonSerializer}). Without this bridge Gson
+     * reflects over JsonNode's private fields and emits a {@code {_children, _nodeFactory, _value}} mess on the wire.
      */
     private JsonElement toGson(JsonNode node) {
         if (node == null || node.isNull()) {

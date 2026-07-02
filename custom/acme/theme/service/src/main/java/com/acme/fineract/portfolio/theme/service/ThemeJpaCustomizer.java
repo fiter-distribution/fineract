@@ -34,9 +34,9 @@ public class ThemeJpaCustomizer implements EntityManagerFactoryCustomizer {
     public Set<String> additionalPackagesToScan() {
         // .domain: JPA entities (UserThemePreference, ThemeSkin, ...) and enum converters
         // .serialization: JsonNodeAttributeConverter — EclipseLink resolves @Convert classes
-        //                 against the persistence unit's scanned packages, so referenced
-        //                 converters must live under a scanned package or load will fail
-        //                 with "converter class ... was not found".
+        // against the persistence unit's scanned packages, so referenced
+        // converters must live under a scanned package or load will fail
+        // with "converter class ... was not found".
         return Set.of("com.acme.fineract.portfolio.theme.domain", "com.acme.fineract.portfolio.theme.serialization");
     }
 }

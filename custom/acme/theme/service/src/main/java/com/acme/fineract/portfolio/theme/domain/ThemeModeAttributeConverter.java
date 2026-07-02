@@ -23,8 +23,8 @@ import jakarta.persistence.Converter;
 
 /**
  * Persists {@link ThemeMode} as the lowercase API value (e.g. {@code "day"}) instead of the JPA default of
- * {@code Enum.name()} ({@code "DAY"}). Keeps the database value aligned with the FE contract in
- * {@code theme.types.ts} so the JSON column and the enum column stay consistent.
+ * {@code Enum.name()} ({@code "DAY"}). Keeps the database value aligned with the FE contract in {@code theme.types.ts}
+ * so the JSON column and the enum column stay consistent.
  */
 @Converter
 public class ThemeModeAttributeConverter implements AttributeConverter<ThemeMode, String> {

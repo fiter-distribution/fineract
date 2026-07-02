@@ -73,8 +73,7 @@ public class ThemeAssetsApiResource {
     @POST
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     @Produces(MediaType.APPLICATION_JSON)
-    @Operation(summary = "Upload a theme asset",
-            description = "Multipart upload of a logo / favicon image. The `assetKey` form field identifies the slot (e.g. `global-logo-light`); uploading the same key replaces the previous file.")
+    @Operation(summary = "Upload a theme asset", description = "Multipart upload of a logo / favicon image. The `assetKey` form field identifies the slot (e.g. `global-logo-light`); uploading the same key replaces the previous file.")
     public String upload(@FormDataParam("assetKey") String assetKey, @FormDataParam("file") InputStream fileStream,
             @FormDataParam("file") FormDataContentDisposition fileDetail, @FormDataParam("file") FormDataBodyPart filePart) {
         var user = context.authenticatedUser();
@@ -89,8 +88,7 @@ public class ThemeAssetsApiResource {
 
     @GET
     @Path("{assetKey}")
-    @Operation(summary = "Stream a theme asset by key",
-            description = "Public endpoint — no authentication required. Theme branding assets must be reachable by the login page before a user has authenticated. Whitelisted in SecurityConfig for `GET /api/*/themes/assets/*`.")
+    @Operation(summary = "Stream a theme asset by key", description = "Public endpoint — no authentication required. Theme branding assets must be reachable by the login page before a user has authenticated. Whitelisted in SecurityConfig for `GET /api/*/themes/assets/*`.")
     public Response download(@PathParam("assetKey") String assetKey) {
         var asset = readService.downloadAsset(assetKey);
         StreamingOutput streaming = output -> {

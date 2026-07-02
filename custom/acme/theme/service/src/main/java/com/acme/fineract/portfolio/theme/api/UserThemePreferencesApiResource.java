@@ -57,10 +57,9 @@ public class UserThemePreferencesApiResource {
     @GET
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @Operation(summary = "Retrieve a user's theme preference",
-            description = "Returns the user's saved theme preference. Falls back to the admin defaults when the user has never customised.")
-    @ApiResponses({ @ApiResponse(responseCode = "200",
-            content = @Content(schema = @Schema(implementation = UserThemePreferenceData.class))) })
+    @Operation(summary = "Retrieve a user's theme preference", description = "Returns the user's saved theme preference. Falls back to the admin defaults when the user has never customised.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = UserThemePreferenceData.class))) })
     public String retrieve(@Parameter(description = "userId") @PathParam("userId") final Long userId) {
         var currentUser = context.authenticatedUser();
         if (!currentUser.getId().equals(userId)) {
@@ -72,8 +71,7 @@ public class UserThemePreferencesApiResource {
     @PUT
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @Operation(summary = "Update a user's theme preference",
-            description = "Upserts the user's theme preference. Self-access is always allowed; updating another user's preference requires `UPDATE_USERTHEMEPREFERENCE`.")
+    @Operation(summary = "Update a user's theme preference", description = "Upserts the user's theme preference. Self-access is always allowed; updating another user's preference requires `UPDATE_USERTHEMEPREFERENCE`.")
     public String update(@Parameter(description = "userId") @PathParam("userId") final Long userId, final String apiRequestBodyAsJson) {
         var currentUser = context.authenticatedUser();
         if (!currentUser.getId().equals(userId)) {
