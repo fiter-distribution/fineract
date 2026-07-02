@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements. See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership. The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License. You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied. See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <!-- ============================================================ -->
+    <!-- Single Dashboard Summary Report                              -->
+    <!-- Combines all 10 dashboard metrics into ONE query             -->
+    <!-- Endpoint: /runreports/Dashboard Summary                      -->
+    <!-- Parameter: R_officeId                                        -->
+    <!-- ============================================================ -->
+    <changeSet author="fineract" id="dashboard-summary-single-report">
+        <insert tableName="stretchy_report">
+            <column name="report_name" value="Dashboard Summary"/>
+            <column name="report_type" value="Table"/>
+            <column name="report_subtype" value=""/>
+            <column name="report_category" value="Dashboard"/>
+            <column name="report_sql" value="SELECT
+    clients.totalActiveClients,
+    loans.totalLoans,
+    loans.activeLoans,
+    loans.pendingApprovalLoans,
+    loans.closedLoans,
+    savings.totalSavingsAccounts,
+    savings.activeSavings,
+    demand.AmountDue,
+    demand.AmountPaid,
+    disbursal.amountToBeDisburse,
+    disbursal.disbursedAmount,
+    clienttrend.clientTrendData,
+    loantrend.loanTrendData,
+    offices.officeData,
+    loanproducts.loanProductData,
+    clientbyoffice.clientByOfficeData
+FROM
+(SELECT COUNT(c.id) AS totalActiveClients FROM m_client c
+    JOIN m_office o ON o.id = c.office_id
+    WHERE c.status_enum = 300
+    AND o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+) clients,
+(SELECT COUNT(l.id) AS totalLoans,
+    COALESCE(SUM(CASE WHEN l.loan_status_id = 300 THEN 1 ELSE 0 END), 0) AS activeLoans,
+    COALESCE(SUM(CASE WHEN l.loan_status_id = 200 THEN 1 ELSE 0 END), 0) AS pendingApprovalLoans,
+    COALESCE(SUM(CASE WHEN l.loan_status_id = 600 THEN 1 ELSE 0 END), 0) AS closedLoans
+    FROM m_loan l
+    JOIN m_client cl ON cl.id = l.client_id
+    JOIN m_office o ON o.id = cl.office_id
+    WHERE o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+) loans,
+(SELECT COUNT(sa.id) AS totalSavingsAccounts,
+    COALESCE(SUM(CASE WHEN sa.status_enum = 300 THEN 1 ELSE 0 END), 0) AS activeSavings
+    FROM m_savings_account sa
+    JOIN m_client cl ON cl.id = sa.client_id
+    JOIN m_office o ON o.id = cl.office_id
+    WHERE o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+) savings,
+(SELECT
+    COALESCE(SUM(ls.principal_amount), 0) - COALESCE(SUM(ls.principal_writtenoff_derived), 0)
+     + COALESCE(SUM(ls.interest_amount), 0) - COALESCE(SUM(ls.interest_writtenoff_derived), 0)
+     - COALESCE(SUM(ls.interest_waived_derived), 0)
+     + COALESCE(SUM(ls.fee_charges_amount), 0) - COALESCE(SUM(ls.fee_charges_writtenoff_derived), 0)
+     - COALESCE(SUM(ls.fee_charges_waived_derived), 0)
+     + COALESCE(SUM(ls.penalty_charges_amount), 0) - COALESCE(SUM(ls.penalty_charges_writtenoff_derived), 0)
+     - COALESCE(SUM(ls.penalty_charges_waived_derived), 0)
+     - (COALESCE(SUM(ls.principal_completed_derived), 0) - COALESCE(SUM(ls.principal_writtenoff_derived), 0)
+        + COALESCE(SUM(ls.interest_completed_derived), 0) - COALESCE(SUM(ls.interest_writtenoff_derived), 0)
+        - COALESCE(SUM(ls.interest_waived_derived), 0)
+        + COALESCE(SUM(ls.fee_charges_completed_derived), 0) - COALESCE(SUM(ls.fee_charges_writtenoff_derived), 0)
+        - COALESCE(SUM(ls.fee_charges_waived_derived), 0)
+        + COALESCE(SUM(ls.penalty_charges_completed_derived), 0) - COALESCE(SUM(ls.penalty_charges_writtenoff_derived), 0)
+        - COALESCE(SUM(ls.penalty_charges_waived_derived), 0))
+    AS AmountDue,
+    COALESCE(SUM(ls.principal_completed_derived), 0) - COALESCE(SUM(ls.principal_writtenoff_derived), 0)
+     + COALESCE(SUM(ls.interest_completed_derived), 0) - COALESCE(SUM(ls.interest_writtenoff_derived), 0)
+     - COALESCE(SUM(ls.interest_waived_derived), 0)
+     + COALESCE(SUM(ls.fee_charges_completed_derived), 0) - COALESCE(SUM(ls.fee_charges_writtenoff_derived), 0)
+     - COALESCE(SUM(ls.fee_charges_waived_derived), 0)
+     + COALESCE(SUM(ls.penalty_charges_completed_derived), 0) - COALESCE(SUM(ls.penalty_charges_writtenoff_derived), 0)
+     - COALESCE(SUM(ls.penalty_charges_waived_derived), 0)
+    AS AmountPaid
+    FROM m_office o
+    LEFT JOIN m_client cl ON o.id = cl.office_id
+    LEFT JOIN m_loan ln ON cl.id = ln.client_id
+    LEFT JOIN m_loan_repayment_schedule ls ON ln.id = ls.loan_id
+    WHERE o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+) demand,
+(SELECT
+    COALESCE(awaitind.amount, 0) - COALESCE(disbursed.amount, 0) AS amountToBeDisburse,
+    COALESCE(disbursed.amount, 0) AS disbursedAmount
+    FROM
+    (SELECT COALESCE(SUM(ln.principal_amount), 0) AS amount
+        FROM m_office o
+        LEFT JOIN m_client cl ON cl.office_id = o.id
+        LEFT JOIN m_loan ln ON cl.id = ln.client_id
+        WHERE (ln.loan_status_id = 200 OR ln.loan_status_id = 300)
+        AND o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+    ) awaitind,
+    (SELECT COALESCE(SUM(ltrxn.amount), 0) AS amount
+        FROM m_office o
+        LEFT JOIN m_client cl ON cl.office_id = o.id
+        LEFT JOIN m_loan ln ON cl.id = ln.client_id
+        LEFT JOIN m_loan_transaction ltrxn ON ln.id = ltrxn.loan_id
+        WHERE ltrxn.is_reversed = false AND ltrxn.transaction_type_enum = 1
+        AND o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+    ) disbursed
+) disbursal,
+(SELECT CAST(COALESCE(STRING_AGG(CONCAT(cnt, ':', mnth), ','), '') AS VARCHAR(2000)) AS clientTrendData
+    FROM (
+        SELECT COUNT(cl.id) AS cnt, TRIM(TO_CHAR(cl.activation_date, 'Month')) AS mnth
+        FROM m_office o LEFT JOIN m_client cl ON o.id = cl.office_id
+        WHERE o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+        AND cl.activation_date BETWEEN (CURRENT_DATE - INTERVAL '12 months') AND CURRENT_DATE
+        GROUP BY TRIM(TO_CHAR(cl.activation_date, 'Month')), EXTRACT(MONTH FROM cl.activation_date)
+        ORDER BY EXTRACT(MONTH FROM cl.activation_date) ASC
+    ) ct
+) clienttrend,
+(SELECT CAST(COALESCE(STRING_AGG(CONCAT(cnt, ':', mnth), ','), '') AS VARCHAR(2000)) AS loanTrendData
+    FROM (
+        SELECT COUNT(ln.id) AS cnt, TRIM(TO_CHAR(ln.disbursedon_date, 'Month')) AS mnth
+        FROM m_office o
+        LEFT JOIN m_client cl ON o.id = cl.office_id
+        LEFT JOIN m_loan ln ON cl.id = ln.client_id
+        WHERE o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+        AND ln.disbursedon_date BETWEEN (CURRENT_DATE - INTERVAL '12 months') AND CURRENT_DATE
+        GROUP BY TRIM(TO_CHAR(ln.disbursedon_date, 'Month')), EXTRACT(MONTH FROM ln.disbursedon_date)
+        ORDER BY EXTRACT(MONTH FROM ln.disbursedon_date) ASC
+    ) lt
+) loantrend,
+(SELECT CAST(COALESCE(STRING_AGG(CONCAT(CAST(o.id AS VARCHAR), ':', o.name), ','), '') AS VARCHAR(4000)) AS officeData
+    FROM m_office o
+    WHERE o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+    ORDER BY o.hierarchy
+) offices,
+(SELECT CAST(COALESCE(STRING_AGG(CONCAT(CAST(lp.id AS VARCHAR), ':', lp.name), ','), '') AS VARCHAR(4000)) AS loanProductData
+    FROM m_product_loan lp
+) loanproducts,
+(SELECT CAST(COALESCE(STRING_AGG(CONCAT(CAST(o.id AS VARCHAR), ':', o.name, ':', CAST(COALESCE(cc.cnt, 0) AS VARCHAR)), ','), '') AS VARCHAR(4000)) AS clientByOfficeData
+    FROM m_office o
+    LEFT JOIN (
+        SELECT c.office_id, COUNT(c.id) AS cnt FROM m_client c WHERE c.status_enum = 300 GROUP BY c.office_id
+    ) cc ON cc.office_id = o.id
+    WHERE o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
+    ORDER BY o.name
+) clientbyoffice
+"/>
+            <column name="description" value="Single consolidated dashboard report combining: client count, loan count, savings count, demand vs collection, disbursal vs awaiting, client trend by month, loan trend by month, office listing, loan products, and client count by office"/>
+            <column name="core_report" valueBoolean="true"/>
+            <column name="use_report" valueBoolean="true"/>
+            <column name="self_service_user_report" valueBoolean="false"/>
+        </insert>
+    </changeSet>
+
+    <!-- Link officeId parameter (id=5) to the Dashboard Summary report -->
+    <changeSet author="fineract" id="dashboard-summary-report-param-officeId">
+        <insert tableName="stretchy_report_parameter">
+            <column name="report_id" valueComputed="(SELECT id FROM stretchy_report WHERE report_name = 'Dashboard Summary')"/>
+            <column name="parameter_id" valueNumeric="5"/>
+            <column name="report_parameter_name" value=""/>
+        </insert>
+    </changeSet>
+
+    <!-- Permission for the Dashboard Summary report -->
+    <changeSet author="fineract" id="dashboard-summary-report-permission">
+        <insert tableName="m_permission">
+            <column name="grouping" value="report"/>
+            <column name="code" value="READ_Dashboard Summary"/>
+            <column name="entity_name" value="Dashboard Summary"/>
+            <column name="action_name" value="READ"/>
+            <column name="can_maker_checker" valueBoolean="false"/>
+        </insert>
+    </changeSet>
+
+</databaseChangeLog>
+

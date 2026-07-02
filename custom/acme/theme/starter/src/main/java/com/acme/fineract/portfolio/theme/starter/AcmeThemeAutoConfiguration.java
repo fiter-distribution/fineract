@@ -26,13 +26,15 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 /**
  * Auto-configuration for the ACME theme module.
  *
- * Unlike sibling acme modules (e.g. note, loan) which are opt-in demos enabled only when {@code acme.note.enabled=true},
- * the theme module is a user-facing feature consumed by the FE and is therefore enabled by default via
- * {@code matchIfMissing = true}. Operators can still disable it explicitly with {@code acme.theme.enabled=false}.
+ * Unlike sibling acme modules (e.g. note, loan) which are opt-in demos enabled only when
+ * {@code acme.note.enabled=true}, the theme module is a user-facing feature consumed by the FE and is therefore enabled
+ * by default via {@code matchIfMissing = true}. Operators can still disable it explicitly with
+ * {@code acme.theme.enabled=false}.
  *
  * Note: Spring Boot's {@code @EntityScan} is intentionally NOT used here; Fineract's {@code JPAConfig} overrides the
- * default {@code EntityManagerFactory} and only honors {@link org.apache.fineract.infrastructure.core.config.jpa.EntityManagerFactoryCustomizer}
- * for additional packages. See {@code ThemeJpaCustomizer}.
+ * default {@code EntityManagerFactory} and only honors
+ * {@link org.apache.fineract.infrastructure.core.config.jpa.EntityManagerFactoryCustomizer} for additional packages.
+ * See {@code ThemeJpaCustomizer}.
  */
 @AutoConfiguration
 @ComponentScan("com.acme.fineract.portfolio.theme")

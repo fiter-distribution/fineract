@@ -1599,10 +1599,10 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
         final DataValidatorBuilder baseDataValidator = new DataValidatorBuilder(dataValidationErrors)
                 .resource(SAVINGS_ACCOUNT_CHARGE_RESOURCE_NAME);
 
-        // Only recurring fees are allowed to inactivate
+        // Only savings recurring fee charge time types (weekly/monthly/annual) are allowed to inactivate
         if (!savingsAccountCharge.isRecurringFee()) {
             baseDataValidator.reset().parameter(null).value(savingsAccountCharge.getId())
-                    .failWithCodeNoParameterAddedToErrorCode("charge.inactivation.allowed.only.for.recurring.charges");
+                    .failWithCodeNoParameterAddedToErrorCode("charge.inactivation.allowed.only.for.recurring.fee.charge.time.type");
             if (!dataValidationErrors.isEmpty()) {
                 throw new PlatformApiDataValidationException(dataValidationErrors);
             }
