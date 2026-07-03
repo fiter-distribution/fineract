@@ -83,8 +83,7 @@ public class ThemeSkinsApiResource {
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @Operation(summary = "Create a new theme skin",
-            description = "Requires the `CREATE_THEMESKIN` permission. The body must include a unique `skinKey`.")
+    @Operation(summary = "Create a new theme skin", description = "Requires the `CREATE_THEMESKIN` permission. The body must include a unique `skinKey`.")
     public String create(final String apiRequestBodyAsJson) {
         final CommandWrapper commandRequest = new ThemeCommandWrapperBuilder().createThemeSkin().withJson(apiRequestBodyAsJson).build();
         return commandSerializer.serialize(commandsSourceWritePlatformService.logCommandSource(commandRequest));
@@ -107,8 +106,7 @@ public class ThemeSkinsApiResource {
     @Path("{skinKey}")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    @Operation(summary = "Delete a theme skin",
-            description = "Rejects deletion of system-managed skins.")
+    @Operation(summary = "Delete a theme skin", description = "Rejects deletion of system-managed skins.")
     public String delete(@Parameter(description = "skinKey") @PathParam("skinKey") final String skinKey) {
         final Long skinId = resolveSkinId(skinKey);
         final CommandWrapper commandRequest = new ThemeCommandWrapperBuilder().deleteThemeSkin(skinId).build();

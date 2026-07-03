@@ -40,5 +40,6 @@ public interface ThemeReadPlatformService {
 
     ThemeAssetStream downloadAsset(String assetKey);
 
-    record ThemeAssetStream(InputStream stream, String contentType, String filename) {}
+    record ThemeAssetStream(InputStream stream, String contentType, String filename) {
+    }
 }

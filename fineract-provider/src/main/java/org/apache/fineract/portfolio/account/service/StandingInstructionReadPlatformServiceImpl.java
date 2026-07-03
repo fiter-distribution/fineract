@@ -150,7 +150,7 @@ public class StandingInstructionReadPlatformServiceImpl implements StandingInstr
 
         if (fromAccountId != null) {
             Integer accountType;
-            if (mostRelevantFromAccountType == 1) {
+            if (Integer.valueOf(1).equals(mostRelevantFromAccountType)) {
                 accountType = PortfolioAccountType.LOAN.getValue();
             } else {
                 accountType = PortfolioAccountType.SAVINGS.getValue();
@@ -165,7 +165,7 @@ public class StandingInstructionReadPlatformServiceImpl implements StandingInstr
             fromClient = this.clientReadPlatformService.retrieveOne(mostRelevantFromClientId);
             mostRelevantFromOfficeId = fromClient.getOfficeId();
             long[] loanStatus = null;
-            if (mostRelevantFromAccountType == 1) {
+            if (Integer.valueOf(1).equals(mostRelevantFromAccountType)) {
                 loanStatus = new long[] { 300, 700 };
             }
             PortfolioAccountDTO portfolioAccountDTO = new PortfolioAccountDTO(mostRelevantFromAccountType, mostRelevantFromClientId,
@@ -209,7 +209,7 @@ public class StandingInstructionReadPlatformServiceImpl implements StandingInstr
             if (toClientOptions != null && toClientOptions.size() == 1) {
                 toClient = new ArrayList<>(toClientOptions).get(0);
 
-                toAccountOptions = retrieveToAccounts(fromAccount, mostRelevantToAccountType, mostRelevantToClientId);
+                toAccountOptions = retrieveToAccounts(fromAccount, mostRelevantToAccountType, toClient.getId());
             }
         }
 

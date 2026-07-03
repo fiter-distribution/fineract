@@ -21,8 +21,9 @@ package com.acme.fineract.portfolio.theme.data;
 import com.google.gson.JsonElement;
 
 /**
- * See {@link AdminThemeConfigData} for why we use Gson {@link JsonElement} instead of Jackson
- * {@code JsonNode} on the response surface.
+ * See {@link AdminThemeConfigData} for why we use Gson {@link JsonElement} instead of Jackson {@code JsonNode} on the
+ * response surface.
  */
 public record ThemeSkinData(Long id, String skinKey, String name, String description, JsonElement colors, JsonElement modes,
-        JsonElement typography, JsonElement branding, JsonElement borderRadius, JsonElement shadows, boolean isSystem) {}
+        JsonElement typography, JsonElement branding, JsonElement borderRadius, JsonElement shadows, boolean isSystem) {
+}
