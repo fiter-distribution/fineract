@@ -30,6 +30,9 @@
     <!-- Parameter: R_officeId                                        -->
     <!-- ============================================================ -->
     <changeSet author="fineract" id="dashboard-summary-single-report">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM stretchy_report WHERE report_name = 'Dashboard Summary'</sqlCheck>
+        </preConditions>
         <insert tableName="stretchy_report">
             <column name="report_name" value="Dashboard Summary"/>
             <column name="report_type" value="Table"/>
@@ -146,21 +149,19 @@ FROM
         ORDER BY EXTRACT(MONTH FROM ln.disbursedon_date) ASC
     ) lt
 ) loantrend,
-(SELECT CAST(COALESCE(STRING_AGG(CONCAT(CAST(o.id AS VARCHAR), ':', o.name), ','), '') AS VARCHAR(4000)) AS officeData
+(SELECT CAST(COALESCE(STRING_AGG(CONCAT(CAST(o.id AS VARCHAR), ':', o.name), ',' ORDER BY o.hierarchy), '') AS VARCHAR(4000)) AS officeData
     FROM m_office o
     WHERE o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
-    ORDER BY o.hierarchy
 ) offices,
 (SELECT CAST(COALESCE(STRING_AGG(CONCAT(CAST(lp.id AS VARCHAR), ':', lp.name), ','), '') AS VARCHAR(4000)) AS loanProductData
     FROM m_product_loan lp
 ) loanproducts,
-(SELECT CAST(COALESCE(STRING_AGG(CONCAT(CAST(o.id AS VARCHAR), ':', o.name, ':', CAST(COALESCE(cc.cnt, 0) AS VARCHAR)), ','), '') AS VARCHAR(4000)) AS clientByOfficeData
+(SELECT CAST(COALESCE(STRING_AGG(CONCAT(CAST(o.id AS VARCHAR), ':', o.name, ':', CAST(COALESCE(cc.cnt, 0) AS VARCHAR)), ',' ORDER BY o.name), '') AS VARCHAR(4000)) AS clientByOfficeData
     FROM m_office o
     LEFT JOIN (
         SELECT c.office_id, COUNT(c.id) AS cnt FROM m_client c WHERE c.status_enum = 300 GROUP BY c.office_id
     ) cc ON cc.office_id = o.id
     WHERE o.hierarchy LIKE CONCAT((SELECT ino.hierarchy FROM m_office ino WHERE ino.id = ${officeId}), '%')
-    ORDER BY o.name
 ) clientbyoffice
 "/>
             <column name="description" value="Single consolidated dashboard report combining: client count, loan count, savings count, demand vs collection, disbursal vs awaiting, client trend by month, loan trend by month, office listing, loan products, and client count by office"/>
@@ -172,6 +173,9 @@ FROM
 
     <!-- Link officeId parameter (id=5) to the Dashboard Summary report -->
     <changeSet author="fineract" id="dashboard-summary-report-param-officeId">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM stretchy_report_parameter WHERE report_id = (SELECT id FROM stretchy_report WHERE report_name = 'Dashboard Summary') AND parameter_id = 5</sqlCheck>
+        </preConditions>
         <insert tableName="stretchy_report_parameter">
             <column name="report_id" valueComputed="(SELECT id FROM stretchy_report WHERE report_name = 'Dashboard Summary')"/>
             <column name="parameter_id" valueNumeric="5"/>
@@ -181,6 +185,9 @@ FROM
 
     <!-- Permission for the Dashboard Summary report -->
     <changeSet author="fineract" id="dashboard-summary-report-permission">
+        <preConditions onFail="MARK_RAN">
+            <sqlCheck expectedResult="0">SELECT COUNT(*) FROM m_permission WHERE code = 'READ_Dashboard Summary'</sqlCheck>
+        </preConditions>
         <insert tableName="m_permission">
             <column name="grouping" value="report"/>
             <column name="code" value="READ_Dashboard Summary"/>
@@ -191,4 +198,3 @@ FROM
     </changeSet>
 
 </databaseChangeLog>
-
