@@ -184,8 +184,8 @@ public class LoanWriteOffWithAdvancedPaymentAllocationTest {
                 () -> LOAN_TRANSACTION_HELPER.makeLoanRepayment(loanExternalIdStr, new PostLoansLoanIdTransactionsRequest()
                         .dateFormat("dd MMMM yyyy").transactionDate("8 September 2022").locale("en").transactionAmount(50.0)));
 
-        assertEquals(400, exception.getResponse().code());
-        assertTrue(exception.getMessage().contains("error.msg.loan.must.be.active.fully.paid.or.overpaid"));
+        assertEquals(403, exception.getResponse().code());
+        assertTrue(exception.getMessage().contains("error.msg.loan.written.off.update.not.allowed"));
     }
 
     @Test
