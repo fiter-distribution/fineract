@@ -676,13 +676,23 @@ public class LoanTransactionValidatorImpl implements LoanTransactionValidator {
 
     @Override
     public void validateLoanNotClosedOrOverpaidForTransactions(Loan loan, LoanTransactionType loanTransactionType) {
-        boolean blockTransactions = configurationDomainService.isBlockTransactionsOnClosedOverpaidLoansEnabled();
         if (LoanTransactionType.CREDIT_BALANCE_REFUND.equals(loanTransactionType)) {
             return;
         }
-        if (blockTransactions && (loan.isClosed() || loan.getStatus().isOverpaid())) {
-            throw new GeneralPlatformDomainRuleException("error.msg.loan.transaction.not.allowed.on.closed.or.overpaid",
-                    "Monetary transactions are not allowed on closed or overpaid loan accounts", loan.getId());
+        boolean isClosed = loan.isClosed();
+        boolean isOverpaid = loan.getStatus().isOverpaid();
+        if (isClosed || isOverpaid) {
+            // Always block repayment-type transactions on closed or overpaid loans
+            if (loanTransactionType != null && loanTransactionType.isRepaymentType()) {
+                throw new GeneralPlatformDomainRuleException("error.msg.loan.transaction.not.allowed.on.closed.or.overpaid",
+                        "Repayment transactions are not allowed on closed or overpaid loan accounts", loan.getId());
+            }
+            // For other transaction types, respect the global configuration
+            boolean blockTransactions = configurationDomainService.isBlockTransactionsOnClosedOverpaidLoansEnabled();
+            if (blockTransactions) {
+                throw new GeneralPlatformDomainRuleException("error.msg.loan.transaction.not.allowed.on.closed.or.overpaid",
+                        "Monetary transactions are not allowed on closed or overpaid loan accounts", loan.getId());
+            }
         }
     }
 

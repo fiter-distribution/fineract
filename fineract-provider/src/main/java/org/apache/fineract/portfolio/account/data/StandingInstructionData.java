@@ -292,33 +292,32 @@ public final class StandingInstructionData {
     }
 
     @JsonProperty("instructionTypeEnum")
-    public StandingInstructionType getInstructionType() {
+    public StandingInstructionType getInstructionTypeEnum() {
         return Optional.ofNullable(this.instructionType).map(e -> StandingInstructionType.fromInt(e.getId().intValue())).orElse(null);
-
     }
 
     @JsonProperty("recurrenceTypeEnum")
-    public AccountTransferRecurrenceType getRecurrenceType() {
+    public AccountTransferRecurrenceType getRecurrenceTypeEnum() {
         return Optional.ofNullable(this.recurrenceType).map(e -> AccountTransferRecurrenceType.fromInt(e.getId().intValue())).orElse(null);
     }
 
     @JsonProperty("recurrenceFrequencyEnum")
-    public PeriodFrequencyType getRecurrenceFrequency() {
+    public PeriodFrequencyType getRecurrenceFrequencyEnum() {
         return Optional.ofNullable(this.recurrenceFrequency).map(e -> PeriodFrequencyType.fromInt(e.getId().intValue())).orElse(null);
     }
 
     @JsonProperty("fromAccountTypeEnum")
-    public PortfolioAccountType getFromAccountType() {
+    public PortfolioAccountType getFromAccountTypeEnum() {
         return Optional.ofNullable(this.fromAccountType).map(e -> PortfolioAccountType.fromInt(e.getId().intValue())).orElse(null);
     }
 
     @JsonProperty("toAccountTypeEnum")
-    public PortfolioAccountType getToAccountType() {
+    public PortfolioAccountType getToAccountTypeEnum() {
         return Optional.ofNullable(this.toAccountType).map(e -> PortfolioAccountType.fromInt(e.getId().intValue())).orElse(null);
     }
 
     @JsonProperty("transferTypeEnum")
-    public AccountTransferType getTransferType() {
+    public AccountTransferType getTransferTypeEnum() {
         return Optional.ofNullable(this.transferType).map(e -> AccountTransferType.fromInt(e.getId().intValue())).orElse(null);
     }
 
@@ -332,10 +331,10 @@ public final class StandingInstructionData {
 
     public Integer toTransferType() {
         Integer transferType = null;
-        AccountTransferType accountTransferType = getTransferType();
-        if (accountTransferType.isChargePayment()) {
+        AccountTransferType accountTransferType = getTransferTypeEnum();
+        if (accountTransferType != null && accountTransferType.isChargePayment()) {
             transferType = LoanTransactionType.CHARGE_PAYMENT.getValue();
-        } else if (accountTransferType.isLoanRepayment()) {
+        } else if (accountTransferType != null && accountTransferType.isLoanRepayment()) {
             transferType = LoanTransactionType.REPAYMENT.getValue();
         }
         return transferType;
