@@ -380,6 +380,15 @@ public class CommandWrapperBuilder {
         return this;
     }
 
+    public CommandWrapperBuilder deleteClientAddress(final long clientId, final long addressId) {
+        this.actionName = ACTION_DELETE;
+        this.entityName = ENTITY_ADDRESS;
+        this.entityId = addressId;
+        this.href = "/clients/" + clientId + "/addresses/" + addressId;
+        this.clientId = clientId;
+        return this;
+    }
+
     public CommandWrapperBuilder addFamilyMembers(final long clientId) {
         this.actionName = ACTION_CREATE;
         this.entityName = ENTITY_FAMILYMEMBERS;
