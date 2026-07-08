@@ -256,4 +256,30 @@ public class AddressWritePlatformServiceImpl implements AddressWritePlatformServ
                 .withEntityId(clientAddressObj.getId()) //
                 .build();
     }
+
+    @Override
+    public CommandProcessingResult deleteClientAddress(final Long clientId, final Long addressId) {
+        this.context.authenticatedUser();
+
+        final ClientAddress clientAddressObj = this.clientAddressRepositoryWrapper.findOneByClientIdAndAddressId(clientId, addressId);
+        if (clientAddressObj == null) {
+            throw new AddressNotFoundException(clientId);
+        }
+
+        final Long clientAddressId = clientAddressObj.getId();
+        final Address address = clientAddressObj.getAddress();
+
+        this.clientAddressRepository.delete(clientAddressObj);
+        this.clientAddressRepository.flush();
+
+        // Delete the address record if no other client references it
+        if (address != null && (address.getClientaddress() == null || address.getClientaddress().isEmpty()
+                || (address.getClientaddress().size() == 1 && address.getClientaddress().contains(clientAddressObj)))) {
+            this.addressRepository.delete(address);
+        }
+
+        return new CommandProcessingResultBuilder() //
+                .withEntityId(clientAddressId) //
+                .build();
+    }
 }

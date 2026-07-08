@@ -26,6 +26,7 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
@@ -121,6 +122,17 @@ public class ClientAddressApiResource {
 
         final CommandWrapper commandRequest = new CommandWrapperBuilder().updateClientAddress(clientid)
                 .withJson(toApiJsonSerializer.serialize(clientAddressRequest)).build();
+        return commandsSourceWritePlatformService.logCommandSource(commandRequest);
+    }
+
+    @DELETE
+    @Path("/{clientid}/addresses/{addressId}")
+    @Produces({ MediaType.APPLICATION_JSON })
+    @Operation(summary = "Delete an address for a Client", operationId = "deleteClientAddress", description = "Deletes the address record associated with the client.")
+    @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = CommandProcessingResult.class)))
+    public CommandProcessingResult deleteClientAddress(@PathParam("clientid") @Parameter(description = "clientId") final long clientid,
+            @PathParam("addressId") @Parameter(description = "addressId") final long addressId) {
+        final CommandWrapper commandRequest = new CommandWrapperBuilder().deleteClientAddress(clientid, addressId).build();
         return commandsSourceWritePlatformService.logCommandSource(commandRequest);
     }
 }
