@@ -350,6 +350,7 @@ public class TransferWritePlatformServiceJpaRepositoryImpl implements TransferWr
         // validation
         this.transfersDataValidator.validateForRejectClientTransfer(jsonCommand.json());
         final Client client = this.clientRepositoryWrapper.findOneWithNotFoundDetection(clientId);
+        validateClientAwaitingTransferAcceptance(client);
         handleClientTransferLifecycleEvent(client, client.getOffice(), TransferEventType.REJECTION, jsonCommand);
         this.clientRepositoryWrapper.saveAndFlush(client);
 
@@ -458,7 +459,7 @@ public class TransferWritePlatformServiceJpaRepositoryImpl implements TransferWr
                 client.updateProposedTransferDate(transferDate);
             break;
             case REJECTION:
-                client.setStatus(ClientStatus.TRANSFER_ON_HOLD.getValue());
+                client.setStatus(ClientStatus.ACTIVE.getValue());
                 client.updateTransferToOffice(null);
                 client.updateProposedTransferDate(null);
             break;

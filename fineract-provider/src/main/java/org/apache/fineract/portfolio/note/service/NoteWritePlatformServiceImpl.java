@@ -20,6 +20,7 @@ package org.apache.fineract.portfolio.note.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Strings;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.fineract.portfolio.client.domain.ClientRepositoryWrapper;
@@ -64,6 +65,11 @@ public class NoteWritePlatformServiceImpl implements NoteWritePlatformService {
 
     @Override
     public NoteCreateResponse createNote(final NoteCreateRequest request) {
+        // Skip note creation if note text is null or empty
+        if (StringUtils.isEmpty(request.getNote())) {
+            return null;
+        }
+
         Note note;
         Long officeId;
 
