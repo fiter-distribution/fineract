@@ -351,7 +351,7 @@ class DefaultLoanLifecycleStateMachineTest {
         // when
         underTest.transition(LoanEvent.LOAN_REJECT_TRANSFER, loan);
         // then
-        assertThat(loan.getStatus()).isEqualTo(LoanStatus.TRANSFER_ON_HOLD);
+        assertThat(loan.getStatus()).isEqualTo(LoanStatus.ACTIVE);
         verify(businessEventNotifierService).notifyPostBusinessEvent(any(LoanStatusChangedBusinessEvent.class));
     }
 

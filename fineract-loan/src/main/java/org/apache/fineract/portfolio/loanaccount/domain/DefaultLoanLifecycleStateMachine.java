@@ -194,7 +194,7 @@ public class DefaultLoanLifecycleStateMachine implements LoanLifecycleStateMachi
             break;
             case LOAN_REJECT_TRANSFER:
                 if (anyOfAllowedWhenComingFrom(from, LoanStatus.TRANSFER_IN_PROGRESS)) {
-                    newState = transferOnHold();
+                    newState = activeTransition();
                 }
             break;
             case LOAN_WITHDRAW_TRANSFER:

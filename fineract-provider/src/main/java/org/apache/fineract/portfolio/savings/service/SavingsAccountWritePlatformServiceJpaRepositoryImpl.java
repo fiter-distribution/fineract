@@ -1164,9 +1164,31 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
 
     @Override
     public void rejectSavingsTransfer(final SavingsAccount savingsAccount) {
+        getAppUserIfPresent();
+
+        final boolean isSavingsInterestPostingAtCurrentPeriodEnd = this.configurationDomainService
+                .isSavingsInterestPostingAtCurrentPeriodEnd();
+        final Integer financialYearBeginningMonth = this.configurationDomainService.retrieveFinancialYearBeginningMonth();
         this.savingAccountAssembler.setHelpers(savingsAccount);
-        savingsAccount.setStatus(SavingsAccountStatusType.TRANSFER_ON_HOLD.getValue());
-        this.savingAccountRepositoryWrapper.save(savingsAccount);
+        final Set<Long> existingTransactionIds = new HashSet<>();
+        final Set<Long> existingReversedTransactionIds = new HashSet<>();
+        updateExistingTransactionsDetails(savingsAccount, existingTransactionIds, existingReversedTransactionIds);
+
+        final SavingsAccountTransaction rejectTransferTransaction = SavingsAccountTransaction.rejectTransfer(savingsAccount,
+                savingsAccount.office(), savingsAccount.retrieveLastTransactionDate());
+        savingsAccount.addTransaction(rejectTransferTransaction);
+        savingsAccount.setStatus(SavingsAccountStatusType.ACTIVE.getValue());
+        final MathContext mc = MathContext.DECIMAL64;
+        boolean isInterestTransfer = false;
+        LocalDate postInterestOnDate = null;
+        boolean postReversals = false;
+        savingsAccount.calculateInterestUsing(mc, savingsAccount.retrieveLastTransactionDate(), isInterestTransfer,
+                isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth, postInterestOnDate, false, postReversals);
+
+        this.savingsAccountTransactionRepository.save(rejectTransferTransaction);
+        this.savingAccountRepositoryWrapper.saveAndFlush(savingsAccount);
+
+        postJournalEntries(savingsAccount, existingTransactionIds, existingReversedTransactionIds, false);
     }
 
     @Override
@@ -2075,6 +2097,9 @@ public class SavingsAccountWritePlatformServiceJpaRepositoryImpl implements Savi
             if ((DateUtils.isEqual(transferDate, transaction.getTransactionDate())
                     && DateUtils.isEqual(transferDate, transaction.getSubmittedOnDate()))
                     || DateUtils.isBefore(transferDate, transaction.getTransactionDate())) {
+                log.info(
+                        "Saving account id {} Transaction date {} is not allowed for transfer as it is same or before the transaction date {} or submitted on date {}",
+                        savingsAccount.getId(), transferDate, transaction.getTransactionDate(), transaction.getSubmittedOnDate());
                 throw new GeneralPlatformDomainRuleException(TransferApiConstants.transferClientSavingsException,
                         TransferApiConstants.transferClientSavingsException, transaction.getTransactionDate(), transferDate);
             }

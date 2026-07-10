@@ -303,6 +303,17 @@ public final class SavingsAccountTransaction extends AbstractAuditableWithUTCDat
                 isReversed, isManualTransaction, lienTransaction, refNo);
     }
 
+    public static SavingsAccountTransaction rejectTransfer(final SavingsAccount savingsAccount, final Office office, final LocalDate date) {
+        final boolean isReversed = false;
+        final boolean isManualTransaction = false;
+        final PaymentDetail paymentDetail = null;
+        final Boolean lienTransaction = false;
+        final String refNo = null;
+        return new SavingsAccountTransaction(savingsAccount, office, paymentDetail,
+                SavingsAccountTransactionType.REJECT_TRANSFER.getValue(), date, savingsAccount.getSummary().getAccountBalance(), isReversed,
+                isManualTransaction, lienTransaction, refNo);
+    }
+
     public static SavingsAccountTransaction withHoldTax(final SavingsAccount savingsAccount, final Office office, final LocalDate date,
             final Money amount, final Map<TaxComponent, BigDecimal> taxDetails) {
         final boolean isReversed = false;

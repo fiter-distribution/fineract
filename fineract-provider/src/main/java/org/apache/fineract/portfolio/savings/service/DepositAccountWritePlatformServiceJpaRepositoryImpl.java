@@ -1115,9 +1115,33 @@ public class DepositAccountWritePlatformServiceJpaRepositoryImpl implements Depo
 
     @Override
     public void rejectSavingsTransfer(final Long accountId, final DepositAccountType depositAccountType) {
+        context.authenticatedUser();
+
+        final boolean isSavingsInterestPostingAtCurrentPeriodEnd = this.configurationDomainService
+                .isSavingsInterestPostingAtCurrentPeriodEnd();
+        final Integer financialYearBeginningMonth = this.configurationDomainService.retrieveFinancialYearBeginningMonth();
+
         final SavingsAccount savingsAccount = this.depositAccountAssembler.assembleFrom(accountId, depositAccountType);
-        savingsAccount.setStatus(SavingsAccountStatusType.TRANSFER_ON_HOLD.getValue());
-        this.savingAccountRepositoryWrapper.save(savingsAccount);
+
+        final Set<Long> existingTransactionIds = new HashSet<>();
+        final Set<Long> existingReversedTransactionIds = new HashSet<>();
+        updateExistingTransactionsDetails(savingsAccount, existingTransactionIds, existingReversedTransactionIds);
+
+        final SavingsAccountTransaction rejectTransferTransaction = SavingsAccountTransaction.rejectTransfer(savingsAccount,
+                savingsAccount.office(), savingsAccount.retrieveLastTransactionDate());
+        savingsAccount.addTransaction(rejectTransferTransaction);
+        savingsAccount.setStatus(SavingsAccountStatusType.ACTIVE.getValue());
+        final boolean postReversals = false;
+        final MathContext mc = MathContext.DECIMAL64;
+        boolean isInterestTransfer = false;
+        LocalDate postInterestOnDate = null;
+        savingsAccount.calculateInterestUsing(mc, savingsAccount.retrieveLastTransactionDate(), isInterestTransfer,
+                isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth, postInterestOnDate, false, postReversals);
+
+        this.savingsAccountTransactionRepository.save(rejectTransferTransaction);
+        this.savingAccountRepositoryWrapper.saveAndFlush(savingsAccount);
+
+        postJournalEntries(savingsAccount, existingTransactionIds, existingReversedTransactionIds);
     }
 
     @Override

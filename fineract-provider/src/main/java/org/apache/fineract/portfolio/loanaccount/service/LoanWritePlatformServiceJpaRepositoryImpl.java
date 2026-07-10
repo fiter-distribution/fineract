@@ -1796,8 +1796,17 @@ public class LoanWritePlatformServiceJpaRepositoryImpl implements LoanWritePlatf
     @Override
     public void rejectLoanTransfer(final Loan loan) {
         businessEventNotifierService.notifyPreBusinessEvent(new LoanRejectTransferBusinessEvent(loan));
+
+        ExternalId externalId = externalIdFactory.create();
+        final LoanTransaction rejectTransferTransaction = LoanTransaction.rejectTransfer(loan.getOffice(), loan,
+                loan.getLastUserTransactionDate(), externalId);
+        loan.addLoanTransaction(rejectTransferTransaction);
         loanLifecycleStateMachine.transition(LoanEvent.LOAN_REJECT_TRANSFER, loan);
+
+        this.loanTransactionRepository.saveAndFlush(rejectTransferTransaction);
+        journalEntryPoster.postJournalEntriesForLoanTransaction(rejectTransferTransaction, false, false);
         saveLoanWithDataIntegrityViolationChecks(loan);
+
         businessEventNotifierService.notifyPostBusinessEvent(new LoanRejectTransferBusinessEvent(loan));
     }
 
