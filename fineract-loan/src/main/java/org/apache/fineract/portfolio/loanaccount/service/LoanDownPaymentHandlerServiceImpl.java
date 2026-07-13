@@ -92,6 +92,7 @@ public class LoanDownPaymentHandlerServiceImpl implements LoanDownPaymentHandler
         }
 
         loanTransaction.updateLoan(loan);
+        loanTransactionRepository.save(loanTransaction);
 
         final boolean isTransactionChronologicallyLatest = loanTransactionService.isChronologicallyLatestRepaymentOrWaiver(loan,
                 loanTransaction);

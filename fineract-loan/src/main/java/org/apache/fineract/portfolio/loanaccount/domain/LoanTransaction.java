@@ -308,10 +308,10 @@ public class LoanTransaction extends AbstractAuditableWithUTCDateTimeCustom<Long
 
     public static LoanTransaction rejectTransfer(final Office office, final Loan loan, final LocalDate transferDate,
             final ExternalId externalId) {
-        return new LoanTransaction(loan, office, LoanTransactionType.REJECT_TRANSFER, transferDate,
-                loan.getSummary().getTotalOutstanding(), loan.getSummary().getTotalPrincipalOutstanding(),
-                loan.getSummary().getTotalInterestOutstanding(), loan.getSummary().getTotalFeeChargesOutstanding(),
-                loan.getSummary().getTotalPenaltyChargesOutstanding(), null, false, null, externalId);
+        return new LoanTransaction(loan, office, LoanTransactionType.REJECT_TRANSFER, transferDate, loan.getSummary().getTotalOutstanding(),
+                loan.getSummary().getTotalPrincipalOutstanding(), loan.getSummary().getTotalInterestOutstanding(),
+                loan.getSummary().getTotalFeeChargesOutstanding(), loan.getSummary().getTotalPenaltyChargesOutstanding(), null, false, null,
+                externalId);
     }
 
     public static LoanTransaction refund(final Office office, final Money amount, final PaymentDetail paymentDetail,
