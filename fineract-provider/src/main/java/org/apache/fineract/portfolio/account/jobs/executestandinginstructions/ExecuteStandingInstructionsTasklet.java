@@ -30,7 +30,6 @@ import org.apache.fineract.infrastructure.core.exception.AbstractPlatformService
 import org.apache.fineract.infrastructure.core.exception.PlatformApiDataValidationException;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.database.DatabaseSpecificSQLGenerator;
-import org.apache.fineract.infrastructure.jobs.exception.JobExecutionException;
 import org.apache.fineract.portfolio.account.PortfolioAccountType;
 import org.apache.fineract.portfolio.account.data.AccountTransferDTO;
 import org.apache.fineract.portfolio.account.data.StandingInstructionData;
@@ -50,6 +49,9 @@ import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -59,6 +61,7 @@ public class ExecuteStandingInstructionsTasklet implements Tasklet {
     private final JdbcTemplate jdbcTemplate;
     private final DatabaseSpecificSQLGenerator sqlGenerator;
     private final AccountTransfersWritePlatformService accountTransfersWritePlatformService;
+    private final PlatformTransactionManager transactionManager;
 
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
@@ -121,7 +124,12 @@ public class ExecuteStandingInstructionsTasklet implements Tasklet {
             }
         }
         if (!errors.isEmpty()) {
-            throw new JobExecutionException(errors);
+            log.warn(
+                    "{} standing instruction transfer(s) failed during execution. Errors are logged in m_account_transfer_standing_instructions_history.",
+                    errors.size());
+            for (Throwable error : errors) {
+                log.warn("Standing instruction transfer failure", error);
+            }
         }
         return RepeatStatus.FINISHED;
     }
@@ -133,7 +141,12 @@ public class ExecuteStandingInstructionsTasklet implements Tasklet {
                 "INSERT INTO m_account_transfer_standing_instructions_history (standing_instruction_id, " + sqlGenerator.escape("status")
                         + ", amount,execution_time, error_log) VALUES (");
         try {
-            accountTransfersWritePlatformService.transferFunds(accountTransferDTO);
+            TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+            transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            transactionTemplate.execute(status -> {
+                accountTransfersWritePlatformService.transferFunds(accountTransferDTO);
+                return null;
+            });
         } catch (final PlatformApiDataValidationException e) {
             errors.add(new Exception("Validation exception while transfering funds for standing Instruction id" + instructionId + " from "
                     + accountTransferDTO.getFromAccountId() + " to " + accountTransferDTO.getToAccountId(), e));
