@@ -92,7 +92,7 @@ public enum LoanStatus {
     }
 
     public boolean isClosed() {
-        return isClosedObligationsMet() || isClosedWrittenOff() || isClosedWithOutsandingAmountMarkedForReschedule();
+        return isClosedObligationsMet() || isClosedWithOutsandingAmountMarkedForReschedule();
     }
 
     public boolean isClosedObligationsMet() {
