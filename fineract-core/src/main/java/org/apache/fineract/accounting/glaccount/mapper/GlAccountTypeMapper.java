@@ -27,6 +27,10 @@ import org.mapstruct.Mapping;
 @Mapper(config = MapstructMapperConfig.class)
 public interface GlAccountTypeMapper {
 
+    default GLAccountType map(Integer value) {
+        return GLAccountType.fromInt(value);
+    }
+
     @Mapping(target = "id", expression = "java((long) glAccountType.getValue())")
     @Mapping(target = "code", source = "glAccountType.code")
     @Mapping(target = "description", source = "glAccountType.code")

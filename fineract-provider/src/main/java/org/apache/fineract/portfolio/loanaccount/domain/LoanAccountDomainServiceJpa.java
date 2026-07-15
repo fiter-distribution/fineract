@@ -715,8 +715,15 @@ public class LoanAccountDomainServiceJpa implements LoanAccountDomainService {
 
         final ScheduleGeneratorDTO scheduleGeneratorDTO = null;
         final LoanRepaymentScheduleInstallment foreCloseDetail = loanBalanceService.fetchLoanForeclosureDetail(loan, foreClosureDate);
-
         loanAccrualsProcessingService.processAccrualsOnLoanForeClosure(loan, foreClosureDate, newTransactions);
+
+        // Persist newly-created accrual transactions BEFORE repository queries trigger auto-flush.
+        for (LoanTransaction transaction : newTransactions) {
+            if (transaction.getId() == null) {
+                LoanTransaction saved = loanAccountService.saveLoanTransactionWithDataIntegrityViolationChecks(transaction);
+                loan.addLoanTransaction(saved);
+            }
+        }
 
         Money interestPayable = foreCloseDetail.getInterestCharged(currency);
         Money feePayable = foreCloseDetail.getFeeChargesCharged(currency);
