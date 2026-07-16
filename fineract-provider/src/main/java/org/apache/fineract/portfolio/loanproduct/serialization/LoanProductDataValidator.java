@@ -752,11 +752,7 @@ public final class LoanProductDataValidator {
             validatePaymentChannelFundSourceMappings(baseDataValidator, element);
             validateChargeToIncomeAccountMappings(baseDataValidator, element);
             validateChargeOffToExpenseMappings(baseDataValidator, element);
-            validateWriteOffToExpenseMappings(baseDataValidator, element);
-            validateClassificationToIncomeMappings(baseDataValidator, element,
-                    LoanProductAccountingParams.BUYDOWN_FEE_CLASSIFICATION_TO_INCOME_ACCOUNT_MAPPINGS);
-            validateClassificationToIncomeMappings(baseDataValidator, element,
-                    LoanProductAccountingParams.CAPITALIZED_INCOME_CLASSIFICATION_TO_INCOME_ACCOUNT_MAPPINGS);
+
         }
 
         if (AccountingValidations.isAccrualBasedAccounting(accountingRuleType)) {
