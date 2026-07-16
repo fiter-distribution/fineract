@@ -193,7 +193,7 @@ public class BulkImportWorkbookServiceImpl implements BulkImportWorkbookService 
         importDocumentRepository.saveAndFlush(importDocument);
 
         final var event = new BulkImportEvent(this, workbook, fileDetail.getFileName(), fileType, importDocument, locale, dateFormat,
-                ThreadLocalContextUtil.getContext(), this.securityContext.authenticatedUser().getId());
+                ThreadLocalContextUtil.getContext(), this.securityContext.authenticatedUser().getId(), fileDetail.getSize());
 
         applicationContext.publishEvent(event);
 

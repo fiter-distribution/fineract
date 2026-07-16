@@ -91,7 +91,12 @@ public class BulkImportEventListener implements ApplicationListener<BulkImportEv
             final var command = new DocumentUpdateCommand();
 
             command.setPayload(DocumentUpdateRequest.builder().id(event.getImportDocument().getDocumentId()).entityId(event.getEntityId())
-                    .entityType("IMPORT").stream(pipedInputStream).build());
+                    .entityType("IMPORT").fileName(event.getFileName()).type(event.getFileType()).size(event.getFileSize()) // use
+                                                                                                                            // the
+                                                                                                                            // original
+                                                                                                                            // file
+                                                                                                                            // size
+                    .stream(pipedInputStream).build());
 
             final Supplier<DocumentCreateResponse> response = dispatcher.dispatch(command);
 

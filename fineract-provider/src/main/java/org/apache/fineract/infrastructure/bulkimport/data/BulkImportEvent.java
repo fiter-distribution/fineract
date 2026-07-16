@@ -41,8 +41,11 @@ public final class BulkImportEvent extends FineractEvent {
 
     private final Long entityId;
 
+    private final long fileSize;
+
     public BulkImportEvent(final Object source, final Workbook workbook, final String fileName, String fileType,
-            final ImportDocument importDocument, final String locale, final String dateFormat, FineractContext context, Long entityId) {
+            final ImportDocument importDocument, final String locale, final String dateFormat, FineractContext context, Long entityId,
+            long fileSize) {
         super(source, context);
         this.workbook = workbook;
         this.fileName = fileName;
@@ -51,5 +54,6 @@ public final class BulkImportEvent extends FineractEvent {
         this.locale = locale;
         this.dateFormat = dateFormat;
         this.entityId = entityId;
+        this.fileSize = fileSize;
     }
 }
