@@ -169,13 +169,6 @@ public class LineOfCreditBalanceUpdateService {
             recomputeLocSummaryFromDate(transactionDate, lineOfCredit);
         }
 
-        // PAYABLE LOCs track consumed amount as sum(principal_outstanding) on linked loans, not as
-        // creditLimit - availableBalance (which ignores blocked amount and can drift via interest-inclusive
-        // repayments).
-        if (lineOfCredit.getProductType() != null && lineOfCredit.getProductType().isPayable()) {
-            reconcileConsumedAmountFromLoanData(lineOfCredit);
-        }
-
         // Final validation: Ensure consumed amount is never negative (defensive check)
         if (lineOfCredit.getSummary().getConsumedAmount().compareTo(BigDecimal.ZERO) < 0) {
             log.error(
@@ -417,7 +410,7 @@ public class LineOfCreditBalanceUpdateService {
             baseTotalDrawDownCount = BigDecimal.ZERO;
         }
 
-        BigDecimal baseConsumedAmount = lineOfCredit.getEffectiveDrawableLimit().subtract(baseAvailableBalance).max(BigDecimal.ZERO);
+        BigDecimal baseConsumedAmount = lineOfCredit.getMaximumAmount().subtract(baseAvailableBalance);
 
         // 4. Start running values from the baseline
         BigDecimal runningAvailableBalance = baseAvailableBalance;
@@ -506,14 +499,10 @@ public class LineOfCreditBalanceUpdateService {
             transactionsToSave.add(tx);
         }
 
-        // 6. Update LOC summary — PAYABLE LOCs derive consumed from live loan principal outstanding
+        // 6. Update LOC summary
+        lineOfCredit.getSummary().setConsumedAmount(runningConsumedAmount);
+        lineOfCredit.getSummary().setAvailableBalance(runningAvailableBalance);
         lineOfCredit.getSummary().setTotalDrawDownCountDerived(totalDrawDownCount);
-        if (lineOfCredit.getProductType() != null && lineOfCredit.getProductType().isPayable()) {
-            reconcileConsumedAmountFromLoanData(lineOfCredit);
-        } else {
-            lineOfCredit.getSummary().setConsumedAmount(runningConsumedAmount);
-            lineOfCredit.getSummary().setAvailableBalance(runningAvailableBalance);
-        }
 
         // 7. Save updated transactions (those from startDate onward)
         lineOfCreditTransactionRepository.saveAll(transactionsToSave);
