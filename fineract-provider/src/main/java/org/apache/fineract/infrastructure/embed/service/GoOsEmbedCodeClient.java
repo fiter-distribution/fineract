@@ -42,7 +42,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(name = "acme.embed.enabled", havingValue = "true", matchIfMissing = true)
-public class GoOsEmbedCodeClient {
+public final class GoOsEmbedCodeClient {
 
     static final String MINT_PATH = "/api/auth/embed-codes";
 
