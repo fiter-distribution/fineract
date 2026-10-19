@@ -21,7 +21,9 @@ package org.apache.fineract.infrastructure.embed.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -31,6 +33,7 @@ import jakarta.ws.rs.core.Response;
 import org.apache.fineract.infrastructure.embed.service.EmbedCode;
 import org.apache.fineract.infrastructure.embed.service.EmbedCodeException;
 import org.apache.fineract.infrastructure.embed.service.GoOsEmbedCodeClient;
+import org.apache.fineract.infrastructure.security.exception.NoAuthorizationException;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.useradministration.domain.AppUser;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,9 +47,10 @@ class EmbedCodeApiResourceTest {
     private final GoOsEmbedCodeClient client = mock(GoOsEmbedCodeClient.class);
     private final EmbedCodeApiResource resource = new EmbedCodeApiResource(context, client);
 
+    private final AppUser user = mock(AppUser.class);
+
     @BeforeEach
     void signedIn() {
-        AppUser user = mock(AppUser.class);
         when(user.getUsername()).thenReturn("mifos");
         when(context.authenticatedUser()).thenReturn(user);
     }
@@ -61,6 +65,24 @@ class EmbedCodeApiResourceTest {
         assertEquals("{\"code\":\"one-time\",\"expiresInSeconds\":60}", response.getEntity());
         assertEquals("no-store", response.getHeaderString("Cache-Control"));
         verify(client).mint(KEY);
+    }
+
+    @Test
+    void checksTheAiAssistantPermission() {
+        when(client.mint(KEY)).thenReturn(new EmbedCode("one-time", 60));
+
+        resource.mint("Basic " + KEY);
+
+        verify(user).validateHasPermissionTo("USE_AIASSISTANT");
+    }
+
+    @Test
+    void refusesAUserWithoutTheAiAssistantPermissionWithoutCallingTheGateway() {
+        doThrow(new NoAuthorizationException("User has no authority to: USE_AIASSISTANT")).when(user)
+                .validateHasPermissionTo("USE_AIASSISTANT");
+
+        assertThrows(NoAuthorizationException.class, () -> resource.mint("Basic " + KEY));
+        verify(client, never()).mint(any());
     }
 
     @Test
