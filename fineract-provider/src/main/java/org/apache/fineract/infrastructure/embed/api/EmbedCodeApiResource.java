@@ -37,6 +37,7 @@ import org.apache.fineract.infrastructure.embed.service.EmbedCode;
 import org.apache.fineract.infrastructure.embed.service.EmbedCodeException;
 import org.apache.fineract.infrastructure.embed.service.GoOsEmbedCodeClient;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
+import org.apache.fineract.useradministration.domain.AppUser;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -48,6 +49,10 @@ import org.springframework.stereotype.Component;
  * usual Basic authentication and posts only the code it gets back. The key is read from the request's own
  * {@code Authorization} header, which Spring Security has already verified, so the endpoint takes no key in its body
  * and can only mint for the signed-in user.
+ *
+ * <p>
+ * Only users holding {@value #AI_ASSISTANT_PERMISSION} (or {@code ALL_FUNCTIONS}) get a code: hiding the assistant in
+ * the webapp is not enough on its own, since without a code the chat panel cannot sign in at all.
  */
 @Slf4j
 @Path("/v1/fiter/embed-codes")
@@ -57,6 +62,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class EmbedCodeApiResource {
 
+    static final String AI_ASSISTANT_PERMISSION = "USE_AIASSISTANT";
     private static final String BASIC = "basic ";
 
     private final PlatformSecurityContext context;
@@ -67,7 +73,9 @@ public class EmbedCodeApiResource {
     @Produces({ MediaType.APPLICATION_JSON })
     @Operation(summary = "Mint a one-time code for the fiter-os chat panel", description = "Returns {code, expiresInSeconds}. The code works once, for about a minute.")
     public Response mint(@HeaderParam(HttpHeaders.AUTHORIZATION) String authorization) {
-        String username = context.authenticatedUser().getUsername();
+        AppUser user = context.authenticatedUser();
+        user.validateHasPermissionTo(AI_ASSISTANT_PERMISSION);
+        String username = user.getUsername();
 
         String key = basicKey(authorization);
         if (key == null) {
