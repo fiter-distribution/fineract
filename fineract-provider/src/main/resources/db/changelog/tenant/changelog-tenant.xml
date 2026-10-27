@@ -256,4 +256,5 @@
     <include file="parts/0235_transaction_summary_reports_buydown_fee_allocation.xml" relativeToChangelogFile="true" />
     <include file="parts/0236_add_dashboard_summary_reports.xml" relativeToChangelogFile="true" />
     <include file="parts/fiter_0001_add_ai_assistant_permission.xml" relativeToChangelogFile="true" />
+    <include file="parts/fiter_0002_add_go_session_token_table.xml" relativeToChangelogFile="true" />
 </databaseChangeLog>

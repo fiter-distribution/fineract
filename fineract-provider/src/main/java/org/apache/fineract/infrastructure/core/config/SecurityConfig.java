@@ -48,6 +48,7 @@ import org.apache.fineract.infrastructure.security.service.PlatformUserDetailsCh
 import org.apache.fineract.infrastructure.security.service.TemporaryPasswordAwareAuthenticationProvider;
 import org.apache.fineract.infrastructure.security.service.TenantAwareJpaPlatformUserDetailsService;
 import org.apache.fineract.infrastructure.security.service.TwoFactorService;
+import org.apache.fineract.infrastructure.sessiontoken.filter.SessionTokenAuthenticationFilter;
 import org.apache.fineract.notification.service.UserNotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -73,6 +74,8 @@ import org.springframework.security.web.access.intercept.RequestAuthorizationCon
 import org.springframework.security.web.authentication.www.BasicAuthenticationEntryPoint;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -119,6 +122,10 @@ public class SecurityConfig {
     private ProgressiveLoanModelCheckerFilter progressiveLoanModelCheckerFilter;
     @Autowired
     private PlatformUserDetailsChecker platformUserDetailsChecker;
+    // Fiter Go OS session tokens (infrastructure.sessiontoken, Go OS ADR 0032). Always registered; it acts only on an
+    // "Authorization: Bearer fgt_..." header, so Basic sign-in is unchanged.
+    @Autowired(required = false)
+    private SessionTokenAuthenticationFilter sessionTokenAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -135,6 +142,9 @@ public class SecurityConfig {
             auth.requestMatchers(API_MATCHER.matcher(HttpMethod.OPTIONS, "/api/**")).permitAll()
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.POST, "/api/*/echo")).permitAll()
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.POST, "/api/*/authentication")).permitAll()
+                    // Renew and revoke carry the session token in the body and check it themselves: a token past
+                    // its 15-minute window no longer authenticates, but may still be renewed or revoked.
+                    .requestMatchers(sessionTokenBodyEndpoints()).permitAll()
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.POST, "/api/*/password/forgot")).permitAll()
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.PUT, "/api/*/instance-mode")).permitAll()
                     // Theme branding assets (logos, favicons) are inherently public — the login page
@@ -431,6 +441,10 @@ public class SecurityConfig {
                 .addFilterAfter(correlationHeaderFilter(), RequestResponseFilter.class)
                 .addFilterAfter(fineractInstanceModeApiFilter(), CorrelationHeaderFilter.class);
 
+        if (sessionTokenAuthenticationFilter != null) {
+            http.addFilterAfter(sessionTokenAuthenticationFilter, TenantAwareBasicAuthenticationFilter.class);
+        }
+
         if (loanCOBFilterHelper != null) {
             http.addFilterAfter(loanCOBApiFilter(), FineractInstanceModeApiFilter.class).addFilterAfter(idempotencyStoreFilter(),
                     LoanCOBApiFilter.class);
@@ -460,6 +474,14 @@ public class SecurityConfig {
         }
 
         return http.build();
+    }
+
+    private RequestMatcher sessionTokenBodyEndpoints() {
+        if (sessionTokenAuthenticationFilter == null) {
+            return request -> false;
+        }
+        return new OrRequestMatcher(API_MATCHER.matcher(HttpMethod.POST, "/api/*/fiter/session-tokens/renew"),
+                API_MATCHER.matcher(HttpMethod.POST, "/api/*/fiter/session-tokens/revoke"));
     }
 
     public RequestResponseFilter requestResponseFilter() {
