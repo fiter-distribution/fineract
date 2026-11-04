@@ -36,6 +36,8 @@ import org.apache.fineract.infrastructure.core.filters.IdempotencyStoreHelper;
 import org.apache.fineract.infrastructure.core.filters.RequestResponseFilter;
 import org.apache.fineract.infrastructure.core.serialization.ToApiJsonSerializer;
 import org.apache.fineract.infrastructure.core.service.MDCWrapper;
+import org.apache.fineract.infrastructure.fitersession.filter.SessionTokenAuthenticationFilter;
+import org.apache.fineract.infrastructure.fitersession.service.SessionTokenService;
 import org.apache.fineract.infrastructure.instancemode.filter.FineractInstanceModeApiFilter;
 import org.apache.fineract.infrastructure.jobs.filter.LoanCOBApiFilter;
 import org.apache.fineract.infrastructure.jobs.filter.LoanCOBFilterHelper;
@@ -119,6 +121,8 @@ public class SecurityConfig {
     private ProgressiveLoanModelCheckerFilter progressiveLoanModelCheckerFilter;
     @Autowired
     private PlatformUserDetailsChecker platformUserDetailsChecker;
+    @Autowired(required = false)
+    private SessionTokenService sessionTokenService;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -137,6 +141,10 @@ public class SecurityConfig {
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.POST, "/api/*/authentication")).permitAll()
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.POST, "/api/*/password/forgot")).permitAll()
                     .requestMatchers(API_MATCHER.matcher(HttpMethod.PUT, "/api/*/instance-mode")).permitAll()
+                    // Fiter session tokens: renew and revoke check the token themselves, because a lapsed
+                    // token may still be renewed; the filter below never authenticates these two paths.
+                    .requestMatchers(API_MATCHER.matcher(HttpMethod.POST, "/api/*/fiter/session-tokens/renew")).permitAll()
+                    .requestMatchers(API_MATCHER.matcher(HttpMethod.DELETE, "/api/*/fiter/session-tokens/current")).permitAll()
                     // Theme branding assets (logos, favicons) are inherently public — the login page
                     // must be able to render the tenant logo before any user has authenticated.
                     // Uploads still require CREATE_THEMEASSET, only the GET (download) is public.
@@ -430,6 +438,11 @@ public class SecurityConfig {
                 .addFilterAfter(requestResponseFilter(), ExceptionTranslationFilter.class)
                 .addFilterAfter(correlationHeaderFilter(), RequestResponseFilter.class)
                 .addFilterAfter(fineractInstanceModeApiFilter(), CorrelationHeaderFilter.class);
+
+        if (sessionTokenService != null) {
+            // After the tenant filter, which binds the tenant and passes a non-Basic header on untouched.
+            http.addFilterAfter(new SessionTokenAuthenticationFilter(sessionTokenService), TenantAwareBasicAuthenticationFilter.class);
+        }
 
         if (loanCOBFilterHelper != null) {
             http.addFilterAfter(loanCOBApiFilter(), FineractInstanceModeApiFilter.class).addFilterAfter(idempotencyStoreFilter(),
