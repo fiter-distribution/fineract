@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements. See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership. The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License. You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing,
+    software distributed under the License is distributed on an
+    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+    KIND, either express or implied. See the License for the
+    specific language governing permissions and limitations
+    under the License.
+
+-->
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+    <changeSet author="fineract" id="1" context="postgresql">
+        <createTable tableName="m_fiter_session_token">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_m_fiter_session_token"/>
+            </column>
+            <column name="token_hash" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="chain_id" type="VARCHAR(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="appuser_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="password_fingerprint" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="issued_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="chain_expires_at" type="timestamp with time zone">
+                <constraints nullable="false"/>
+            </column>
+            <column name="renewed_at" type="timestamp with time zone"/>
+            <column name="revoked_at" type="timestamp with time zone"/>
+        </createTable>
+    </changeSet>
+    <changeSet author="fineract" id="2" context="mysql">
+        <createTable tableName="m_fiter_session_token">
+            <column autoIncrement="true" name="id" type="BIGINT">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_m_fiter_session_token"/>
+            </column>
+            <column name="token_hash" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="chain_id" type="VARCHAR(36)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="appuser_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="password_fingerprint" type="VARCHAR(64)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="issued_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="chain_expires_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="renewed_at" type="DATETIME"/>
+            <column name="revoked_at" type="DATETIME"/>
+        </createTable>
+    </changeSet>
+    <changeSet author="fineract" id="3">
+        <addUniqueConstraint tableName="m_fiter_session_token" columnNames="token_hash" constraintName="uq_fiter_session_token_hash"/>
+        <createIndex tableName="m_fiter_session_token" indexName="idx_fiter_session_token_chain">
+            <column name="chain_id"/>
+        </createIndex>
+        <createIndex tableName="m_fiter_session_token" indexName="idx_fiter_session_token_chain_expires">
+            <column name="chain_expires_at"/>
+        </createIndex>
+        <addForeignKeyConstraint baseColumnNames="appuser_id" baseTableName="m_fiter_session_token"
+                                 constraintName="fk_fiter_session_token_appuser" deferrable="false" initiallyDeferred="false"
+                                 onDelete="CASCADE" onUpdate="RESTRICT" referencedColumnNames="id"
+                                 referencedTableName="m_appuser" validate="true"/>
+    </changeSet>
+</databaseChangeLog>
