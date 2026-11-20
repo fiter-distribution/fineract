@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.MonthDay;
 import java.time.OffsetDateTime;
+import java.time.OffsetTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -38,6 +39,7 @@ import org.apache.fineract.infrastructure.core.api.LocalDateAdapter;
 import org.apache.fineract.infrastructure.core.api.LocalDateTimeAdapter;
 import org.apache.fineract.infrastructure.core.api.LocalTimeAdapter;
 import org.apache.fineract.infrastructure.core.api.OffsetDateTimeAdapter;
+import org.apache.fineract.infrastructure.core.api.OffsetTimeAdapter;
 import org.apache.fineract.infrastructure.core.api.ParameterListExclusionStrategy;
 import org.apache.fineract.infrastructure.core.api.ParameterListInclusionStrategy;
 import org.apache.fineract.infrastructure.core.domain.ExternalId;
@@ -105,12 +107,13 @@ public final class GoogleGsonSerializerHelper {
     public static void registerTypeAdapters(final GsonBuilder builder) {
         builder.registerTypeAdapter(java.util.Date.class, new DateAdapter());
         builder.registerTypeAdapter(LocalDate.class, new LocalDateAdapter());
-        // NOTE: was missing, necessary for GSON serialization with JDK 21's restrictive module access
+        // NOTE: was missing, necessary for GSON serialization with JDK 25's restrictive module access
         builder.registerTypeAdapter(LocalTime.class, new LocalTimeAdapter());
         builder.registerTypeAdapter(ZonedDateTime.class, new JodaDateTimeAdapter());
         builder.registerTypeAdapter(MonthDay.class, new JodaMonthDayAdapter());
         builder.registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter());
         builder.registerTypeAdapter(OffsetDateTime.class, new OffsetDateTimeAdapter());
+        builder.registerTypeAdapter(OffsetTime.class, new OffsetTimeAdapter());
         builder.registerTypeAdapter(ExternalId.class, new ExternalIdAdapter());
     }
 }

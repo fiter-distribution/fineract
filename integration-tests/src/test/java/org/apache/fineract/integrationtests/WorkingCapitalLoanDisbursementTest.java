@@ -47,13 +47,14 @@ import org.apache.fineract.client.models.ProjectedAmortizationScheduleData;
 import org.apache.fineract.client.models.PutGlobalConfigurationsRequest;
 import org.apache.fineract.infrastructure.configuration.api.GlobalConfigurationConstants;
 import org.apache.fineract.infrastructure.event.external.data.ExternalEventResponse;
+import org.apache.fineract.integrationtests.client.feign.helpers.FeignClientHelper;
+import org.apache.fineract.integrationtests.client.feign.helpers.FeignCodeHelper;
 import org.apache.fineract.integrationtests.client.feign.helpers.FeignExternalEventHelper;
+import org.apache.fineract.integrationtests.client.feign.helpers.FeignGlobalConfigurationHelper;
+import org.apache.fineract.integrationtests.client.feign.modules.ClientRequestBuilders;
 import org.apache.fineract.integrationtests.common.BusinessDateHelper;
-import org.apache.fineract.integrationtests.common.ClientHelper;
 import org.apache.fineract.integrationtests.common.FineractFeignClientHelper;
-import org.apache.fineract.integrationtests.common.GlobalConfigurationHelper;
 import org.apache.fineract.integrationtests.common.Utils;
-import org.apache.fineract.integrationtests.common.system.CodeHelper;
 import org.apache.fineract.integrationtests.common.workingcapitalloan.WorkingCapitalLoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.workingcapitalloan.WorkingCapitalLoanDisbursementTestBuilder;
 import org.apache.fineract.integrationtests.common.workingcapitalloan.WorkingCapitalLoanHelper;
@@ -65,10 +66,12 @@ import org.junit.jupiter.api.Test;
 
 public class WorkingCapitalLoanDisbursementTest {
 
+    private final FeignClientHelper clientHelper = new FeignClientHelper(FineractFeignClientHelper.getFineractFeignClient());
     private final WorkingCapitalLoanHelper applicationHelper = new WorkingCapitalLoanHelper();
     private final WorkingCapitalLoanProductHelper productHelper = new WorkingCapitalLoanProductHelper();
-    private final CodeHelper codeHelper = new CodeHelper();
-    private final GlobalConfigurationHelper globalConfigurationHelper = new GlobalConfigurationHelper();
+    private final FeignCodeHelper codeHelper = new FeignCodeHelper(FineractFeignClientHelper.getFineractFeignClient());
+    private final FeignGlobalConfigurationHelper globalConfigurationHelper = new FeignGlobalConfigurationHelper(
+            FineractFeignClientHelper.getFineractFeignClient());
     private final FeignExternalEventHelper externalEventHelper = new FeignExternalEventHelper(
             FineractFeignClientHelper.getFineractFeignClient());
 
@@ -133,7 +136,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -301,24 +304,22 @@ public class WorkingCapitalLoanDisbursementTest {
             assertStatus(data, "loanStatusType.active");
             assertNotNull(data.getBalance(), "GET loan after disburse should include balance");
             assertEqualBigDecimal(transactionAmount.add(discountAmount), data.getBalance().getPrincipalOutstanding());
-            assertEqualBigDecimal(discountAmount, data.getDiscount());
+            assertEqualBigDecimal(discountAmount, data.getDiscountFee());
             assertEquals(loanId, data.getId());
-            assertNotNull(data.getClient());
-            assertNotNull(data.getProduct());
+            assertNotNull(data.getClientId());
+            assertNotNull(data.getLoanProductId());
 
             if (data.getTimeline() != null) {
                 assertNotNull(data.getTimeline().getActualDisbursementDate());
                 assertDateEquals(currentDate, data.getTimeline().getActualDisbursementDate());
                 assertNotNull(data.getTimeline().getApprovedOnDate());
                 assertNull(data.getTimeline().getActualMaturityDate(), "Expected actualMaturityDate to be null after disbursement");
-                assertNotNull(data.getTimeline().getDisbursementDetails(), "timeline should include disbursementDetails list");
-                assertFalse(data.getTimeline().getDisbursementDetails().isEmpty(), "timeline disbursementDetails should not be empty");
             }
             assertNotNull(data.getDisbursementDetails(), "GET loan after disburse should include disbursementDetails array");
             assertFalse(data.getDisbursementDetails().isEmpty(), "disbursementDetails should not be empty");
             final GetDisbursementDetail disbursement = data.getDisbursementDetails().getFirst();
             assertNotNull(disbursement.getExpectedDisbursementDate(), "disbursementDetails should include expectedDisbursementDate");
-            assertNotNull(disbursement.getExpectedAmount(), "disbursementDetails should include expectedAmount");
+            assertNotNull(disbursement.getPrincipal(), "disbursementDetails should include principal");
             assertDateEquals(currentDate, disbursement.getActualDisbursementDate());
             assertEqualBigDecimal(transactionAmount, disbursement.getActualAmount());
 
@@ -364,7 +365,9 @@ public class WorkingCapitalLoanDisbursementTest {
             assertStatus(data, "loanStatusType.approved");
             assertEqualBigDecimal(BigDecimal.valueOf(5000), data.getApprovedPrincipal());
             assertNotNull(data.getBalance(), "GET loan after undo should include balance");
-            assertEqualBigDecimal(BigDecimal.valueOf(5000), data.getBalance().getPrincipalOutstanding());
+            // Nothing is paid out after an undo-disbursal, so there is nothing outstanding - the loan is
+            // indistinguishable from one that was approved and never disbursed.
+            assertEqualBigDecimal(BigDecimal.ZERO, data.getBalance().getPrincipalOutstanding());
 
             assertNotNull(data.getDisbursementDetails(), "GET loan after undo should include disbursementDetails array");
             assertFalse(data.getDisbursementDetails().isEmpty(), "disbursementDetails should not be empty");
@@ -433,7 +436,7 @@ public class WorkingCapitalLoanDisbursementTest {
                         .withClientId(createdClientId) //
                         .withProductId(productId) //
                         .withPrincipal(BigDecimal.valueOf(5000)) //
-                        .withPeriodPaymentRate(new BigDecimal("18")) //
+                        .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                         .buildSubmitRequest());
 
                 applicationHelper.approveById(loanId,
@@ -473,7 +476,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -500,7 +503,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -525,7 +528,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -552,7 +555,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -576,7 +579,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -601,7 +604,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -626,7 +629,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -652,7 +655,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .withSubmittedOnDate(currentDate) //
                     .buildSubmitRequest());
 
@@ -680,7 +683,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -709,7 +712,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(approvedPrincipal) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -736,7 +739,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(approvedPrincipal) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -763,13 +766,13 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
             final Long loanId2 = submitAndTrack(new WorkingCapitalLoanApplicationTestBuilder() //
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(3000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId1,
@@ -799,7 +802,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             final var disburseJson = WorkingCapitalLoanDisbursementTestBuilder.buildDisburseRequest(currentDate, BigDecimal.valueOf(5000));
@@ -834,7 +837,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -868,7 +871,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -896,7 +899,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -931,7 +934,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(6000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -970,7 +973,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -993,7 +996,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -1019,7 +1022,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .withExternalId(loanExternalId) //
                     .buildSubmitRequest());
 
@@ -1049,7 +1052,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(7000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -1076,7 +1079,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .withExternalId(loanExternalId) //
                     .buildSubmitRequest());
 
@@ -1105,7 +1108,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(8000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .withExternalId(loanExternalId) //
                     .buildSubmitRequest());
 
@@ -1135,7 +1138,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(9000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .withExternalId(loanExternalId) //
                     .buildSubmitRequest());
 
@@ -1161,7 +1164,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -1187,7 +1190,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -1213,7 +1216,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             final BigDecimal disbursementAmount = BigDecimal.valueOf(5000);
@@ -1243,7 +1246,7 @@ public class WorkingCapitalLoanDisbursementTest {
                     .withClientId(createdClientId) //
                     .withProductId(productId) //
                     .withPrincipal(BigDecimal.valueOf(5000)) //
-                    .withPeriodPaymentRate(new BigDecimal("18")) //
+                    .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                     .buildSubmitRequest());
 
             applicationHelper.approveById(loanId,
@@ -1313,7 +1316,7 @@ public class WorkingCapitalLoanDisbursementTest {
     }
 
     private Long createClient() {
-        return ClientHelper.createClient(ClientHelper.defaultClientCreationRequest()).getClientId();
+        return clientHelper.createClient(ClientRequestBuilders.defaultClient()).getClientId();
     }
 
     private ProjectedAmortizationScheduleData retrieveAmortizationScheduleByLoanId(final Long loanId) {

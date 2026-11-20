@@ -32,6 +32,7 @@ import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
 import org.apache.fineract.organisation.monetary.domain.Money;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanCharge;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanCreditAllocationRule;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanDisbursementDetails;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanInstallmentCharge;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleInstallment;
@@ -39,8 +40,7 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentSchedulePro
 import org.apache.fineract.portfolio.loanaccount.domain.LoanSummary;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransaction;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionComparator;
-import org.apache.fineract.portfolio.loanaccount.domain.LoanTransactionRepository;
-import org.apache.fineract.portfolio.loanproduct.domain.CreditAllocationTransactionType;
+import org.apache.fineract.portfolio.loanproduct.domain.CreditAllocationStrategy;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -49,7 +49,6 @@ public class LoanBalanceService {
 
     private final CapitalizedIncomeBalanceService capitalizedIncomeBalanceService;
     private final FlushModeHandler flushModeHandler;
-    private final LoanTransactionRepository loanTransactionRepository;
 
     public Money calculateTotalOverpayment(final Loan loan) {
         Money totalPaidInRepayments = loan.getTotalPaidInRepayments();
@@ -77,10 +76,13 @@ public class LoanBalanceService {
                     totalPaidInRepayments = totalPaidInRepayments.minus(loanTransaction.getOverPaymentPortion(currency));
                 }
             } else if (loanTransaction.isChargeback()) {
-                if (loanTransaction.getPrincipalPortion(currency).isZero() && loan.getCreditAllocationRules().stream() //
-                        .filter(car -> car.getTransactionType().equals(CreditAllocationTransactionType.CHARGEBACK)) //
-                        .findAny() //
-                        .isEmpty()) {
+                final CreditAllocationStrategy creditAllocationStrategy = LoanCreditAllocationRule
+                        .resolveAllocationStrategy(loan.getCreditAllocationRules(), loanTransaction.getTypeOf());
+                final boolean overpaymentCoversPrincipalOnly = switch (creditAllocationStrategy) {
+                    case PRINCIPAL_ONLY -> true;
+                    case RULE_BASED -> false;
+                };
+                if (loanTransaction.getPrincipalPortion(currency).isZero() && overpaymentCoversPrincipalOnly) {
                     totalPaidInRepayments = totalPaidInRepayments.minus(loanTransaction.getOverPaymentPortion(currency));
                 }
             }
@@ -135,8 +137,9 @@ public class LoanBalanceService {
         }
         if (MathUtil.isZero(summary.getTotalFeeChargesOutstanding())) {
             for (final LoanCharge charge : charges) {
+                // the fee of a tranche that is not disbursed yet is in no installment, so the summary does not cover it
                 if (charge.isActive() && charge.isFeeCharge() && !charge.isPaid() && !charge.isWaived()
-                        && MathUtil.isGreaterThanZero(charge.getAmount())) {
+                        && !charge.isDownPaymentFeeAwaitingDisbursement() && MathUtil.isGreaterThanZero(charge.getAmount())) {
                     charge.reconcileFullyPaid();
                 }
             }
@@ -151,10 +154,17 @@ public class LoanBalanceService {
         }
     }
 
-    private Money calculateTotalRecoveredPayments(Loan loan) {
-        // in case logic for reversing recovered payment is implemented handle subtraction from totalRecoveredPayments
-        final BigDecimal totalRecoveryAmount = loanTransactionRepository.calculateTotalRecoveryPaymentAmount(loan);
-        return Money.of(loan.getCurrency(), totalRecoveryAmount);
+    Money calculateTotalRecoveredPayments(final Loan loan) {
+        // Summed from the loan's transactions rather than queried: the summary is refreshed with FlushModeType.COMMIT
+        // before a new recovery payment is saved, so a query would not see it yet.
+        final MonetaryCurrency currency = loan.getCurrency();
+        Money totalRecovered = Money.zero(currency);
+        for (final LoanTransaction transaction : loan.getLoanTransactions()) {
+            if (transaction.isRecoveryRepayment()) {
+                totalRecovered = totalRecovered.plus(transaction.getAmount(currency));
+            }
+        }
+        return totalRecovered;
     }
 
     public void updateLoanOutstandingBalances(Loan loan) {
@@ -175,8 +185,10 @@ public class LoanBalanceService {
             } else if (loanTransaction.isChargeback() || loanTransaction.isCreditBalanceRefund()) {
                 Money transactionOutstanding = loanTransaction.getPrincipalPortion(loan.getCurrency());
                 if (loanTransaction.isOverPaid()) {
-                    // in case of advanced payment strategy and creditAllocations the full amount is recognized first
-                    if (loan.getCreditAllocationRules() != null && !loan.getCreditAllocationRules().isEmpty()) {
+                    // in case of advanced payment strategy and rule based creditAllocations the full amount is
+                    // recognized first
+                    if (loan.getCreditAllocationRules() != null && loan.getCreditAllocationRules().stream()
+                            .anyMatch(rule -> rule.getAllocationStrategy() == CreditAllocationStrategy.RULE_BASED)) {
                         Money payedPrincipal = loanTransaction.getLoanTransactionToRepaymentScheduleMappings().stream() //
                                 .map(mapping -> mapping.getPrincipalPortion(loan.getCurrency())) //
                                 .reduce(Money.zero(loan.getCurrency()), Money::plus);

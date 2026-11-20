@@ -31,6 +31,7 @@ import static org.apache.fineract.portfolio.savings.SavingsApiConstants.routingC
 import static org.apache.fineract.portfolio.savings.SavingsApiConstants.transactionAccountNumberParamName;
 import static org.apache.fineract.portfolio.savings.SavingsApiConstants.transactionAmountParamName;
 import static org.apache.fineract.portfolio.savings.SavingsApiConstants.transactionDateParamName;
+import static org.apache.fineract.portfolio.savings.SavingsApiConstants.transactionTimeParamName;
 import static org.apache.fineract.portfolio.savings.SavingsApiConstants.withdrawBalanceParamName;
 
 import com.google.gson.JsonElement;
@@ -48,6 +49,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.configuration.domain.ConfigurationDomainService;
+import org.apache.fineract.infrastructure.configuration.service.BackdatedTransactionValidationService;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.data.ApiParameterError;
 import org.apache.fineract.infrastructure.core.data.DataValidatorBuilder;
@@ -79,6 +81,7 @@ public class SavingsAccountTransactionDataValidator {
             Arrays.asList(SavingsApiConstants.dateFormatParamName, SavingsApiConstants.localeParamName, transactionDateParamName,
                     externalIdParamName, IS_POST_INTEREST_AS_ON_PARAM_NAME, POST_INTEREST_MANUAL_OR_AUTOMATIC_PARAM_NAME));
     private final ConfigurationDomainService configurationDomainService;
+    private final BackdatedTransactionValidationService backdatedTransactionValidationService;
 
     private static Set<String> createReleaseAmountRequestDataParameters() {
         final Set<String> requestDataParameters = new HashSet<>(SavingsAccountConstant.SAVINGS_ACCOUNT_TRANSACTION_REQUEST_DATA_PARAMETERS);
@@ -87,6 +90,7 @@ public class SavingsAccountTransactionDataValidator {
     }
 
     public void validateTransactionWithPivotDate(final LocalDate transactionDate, final SavingsAccount savingsAccount) {
+        this.backdatedTransactionValidationService.validateTransactionDate(transactionDate);
         final boolean backdatedTxnsAllowedTill = this.configurationDomainService.retrievePivotDateConfig();
         final boolean isRelaxingDaysConfigOn = this.configurationDomainService.isRelaxingDaysConfigForPivotDateEnabled();
 
@@ -111,8 +115,9 @@ public class SavingsAccountTransactionDataValidator {
         }
 
         final Type typeOfMap = new TypeToken<Map<String, Object>>() {}.getType();
-        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json,
-                SavingsAccountConstant.SAVINGS_ACCOUNT_TRANSACTION_REQUEST_DATA_PARAMETERS);
+        final Set<String> supportedParameters = new HashSet<>(SavingsAccountConstant.SAVINGS_ACCOUNT_TRANSACTION_REQUEST_DATA_PARAMETERS);
+        supportedParameters.add(transactionTimeParamName);
+        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, supportedParameters);
 
         final List<ApiParameterError> dataValidationErrors = new ArrayList<>();
         final DataValidatorBuilder baseDataValidator = new DataValidatorBuilder(dataValidationErrors)
@@ -122,6 +127,7 @@ public class SavingsAccountTransactionDataValidator {
 
         final LocalDate transactionDate = this.fromApiJsonHelper.extractLocalDateNamed(transactionDateParamName, element);
         baseDataValidator.reset().parameter(transactionDateParamName).value(transactionDate).notNull();
+        validateTransactionTime(element, dataValidationErrors);
 
         final BigDecimal transactionAmount = this.fromApiJsonHelper.extractBigDecimalWithLocaleNamed(transactionAmountParamName, element);
         baseDataValidator.reset().parameter(transactionAmountParamName).value(transactionAmount).notNull().positiveAmount();
@@ -129,12 +135,17 @@ public class SavingsAccountTransactionDataValidator {
         final String externalId = this.fromApiJsonHelper.extractStringNamed(externalIdParamName, element);
         baseDataValidator.reset().parameter(externalIdParamName).value(externalId).ignoreIfNull().notExceedingLengthOf(100);
 
-        final Integer paymentType = this.fromApiJsonHelper.extractIntegerWithLocaleNamed(paymentTypeIdParamName, element);
-        baseDataValidator.reset().parameter(paymentTypeIdParamName).value(paymentType).notNull();
-
-        validatePaymentTypeDetails(baseDataValidator, element);
+        validatePaymentTypeDetails(baseDataValidator, element, true);
 
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
+    }
+
+    private void validateTransactionTime(final JsonElement element, final List<ApiParameterError> dataValidationErrors) {
+        try {
+            this.fromApiJsonHelper.extractOffsetTimeNamed(transactionTimeParamName, element);
+        } catch (PlatformApiDataValidationException exception) {
+            dataValidationErrors.addAll(exception.getErrors());
+        }
     }
 
     public void validateActivation(final JsonCommand command) {
@@ -197,14 +208,15 @@ public class SavingsAccountTransactionDataValidator {
                     .failWithCodeNoParameterAddedToErrorCode("account.is.in.blocked.state");
         }
 
-        validatePaymentTypeDetails(baseDataValidator, element);
+        validatePaymentTypeDetails(baseDataValidator, element, false);
 
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
 
-    private void validatePaymentTypeDetails(final DataValidatorBuilder baseDataValidator, JsonElement element) {
+    private void validatePaymentTypeDetails(final DataValidatorBuilder baseDataValidator, JsonElement element,
+            final boolean paymentTypeRequired) {
         // Validate all string payment detail fields for max length
-        boolean checkPaymentTypeDetails = false;
+        boolean checkPaymentTypeDetails = paymentTypeRequired;
         final Integer paymentTypeId = this.fromApiJsonHelper.extractIntegerWithLocaleNamed(paymentTypeIdParamName, element);
         baseDataValidator.reset().parameter(paymentTypeIdParamName).value(paymentTypeId).ignoreIfNull().integerGreaterThanZero();
         final Set<String> paymentDetailParameters = new HashSet<>(Arrays.asList(transactionAccountNumberParamName, checkNumberParamName,
@@ -217,8 +229,8 @@ public class SavingsAccountTransactionDataValidator {
                 checkPaymentTypeDetails = true;
             }
         }
-        if (checkPaymentTypeDetails) {
-            baseDataValidator.reset().parameter(paymentTypeIdParamName).value(paymentTypeId).notBlank().integerGreaterThanZero();
+        if (checkPaymentTypeDetails && paymentTypeId == null) {
+            baseDataValidator.reset().parameter(paymentTypeIdParamName).value(paymentTypeId).notBlank();
         }
 
     }

@@ -30,7 +30,7 @@ dependencies {
             )
 
     implementation(
-            'org.springframework.boot:spring-boot-starter-web',
+            'org.springframework.boot:spring-boot-starter-webmvc',
             'org.springframework.boot:spring-boot-starter-validation',
             'org.springframework.boot:spring-boot-starter-security',
             'org.springframework.boot:spring-boot-starter-data-jdbc',
@@ -40,12 +40,11 @@ dependencies {
 
             'org.apache.commons:commons-lang3',
 
-            'com.github.spotbugs:spotbugs-annotations',
             'io.swagger.core.v3:swagger-annotations-jakarta',
 
             'org.mapstruct:mapstruct',
 
-            'io.github.resilience4j:resilience4j-spring-boot3',
+            'io.github.resilience4j:resilience4j-spring-boot4',
             'org.apache.httpcomponents:httpcore',
 
             'org.apache.tika:tika-core',
@@ -55,6 +54,7 @@ dependencies {
     implementation('org.apache.tika:tika-parser-microsoft-module') {
         exclude group: 'org.apache.poi', module: 'poi-ooxml-full'
     }
+    compileOnly 'com.github.spotbugs:spotbugs-annotations'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     annotationProcessor 'org.mapstruct:mapstruct-processor'
@@ -74,6 +74,5 @@ dependencies {
         exclude group: 'javax.activation'
         exclude group: 'org.skyscreamer'
     }
-    testImplementation ('org.mockito:mockito-inline')
     testImplementation 'com.github.romankh3:image-comparison'
 }

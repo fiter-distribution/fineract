@@ -101,6 +101,8 @@ public class RecurringDepositProductWritePlatformServiceJpaRepositoryImpl implem
 
             final RecurringDepositProduct product = this.recurringDepositProductRepository.findById(productId)
                     .orElseThrow(() -> new RecurringDepositProductNotFoundException(productId));
+            this.fromApiJsonDataValidator.validateProductDatesForUpdate(command.json(), RECURRING_DEPOSIT_PRODUCT_RESOURCE_NAME,
+                    product.getStartDate(), product.getCloseDate());
             final Map<String, Object> changes = product.update(command);
 
             if (changes.containsKey(chargesParamName)) {
@@ -173,13 +175,14 @@ public class RecurringDepositProductWritePlatformServiceJpaRepositoryImpl implem
         String param = null;
         Object[] msgArgs;
         Throwable checkEx = realCause == null ? dae : realCause;
-        if (checkEx.getMessage().contains("sp_unq_name")) {
+        if (checkEx.getMessage().contains("sp_unq_name") || checkEx.getMessage().contains("m_savings_product_name_key")) {
             final String name = command.stringValueOfParameterNamed("name");
             msgCode += ".duplicate.name";
             msg = "Recurring Deposit product with name `" + name + "` already exists";
             param = "name";
             msgArgs = new Object[] { name, dae };
-        } else if (checkEx.getMessage().contains("sp_unq_short_name")) {
+        } else if (checkEx.getMessage().contains("sp_unq_short_name")
+                || checkEx.getMessage().contains("m_savings_product_short_name_key")) {
             final String shortName = command.stringValueOfParameterNamed("shortName");
             msgCode += ".duplicate.short.name";
             msg = "Recurring Deposit product with short name `" + shortName + "` already exists";
@@ -189,7 +192,7 @@ public class RecurringDepositProductWritePlatformServiceJpaRepositoryImpl implem
             msgCode += ".unknown.data.integrity.issue";
             msgArgs = new Object[] { dae };
         }
-        log.error("Error occured.", dae);
+        log.error("Error occurred.", dae);
         throw ErrorHandler.getMappable(dae, msgCode, msg, param, msgArgs);
     }
 }

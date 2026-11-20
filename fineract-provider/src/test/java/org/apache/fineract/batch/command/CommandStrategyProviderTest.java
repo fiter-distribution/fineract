@@ -31,6 +31,7 @@ import org.apache.fineract.batch.command.internal.AdjustLoanTransactionByExterna
 import org.apache.fineract.batch.command.internal.AdjustLoanTransactionCommandStrategy;
 import org.apache.fineract.batch.command.internal.ApplyLoanCommandStrategy;
 import org.apache.fineract.batch.command.internal.ApplySavingsCommandStrategy;
+import org.apache.fineract.batch.command.internal.ApplyWorkingCapitalLoanCommandStrategy;
 import org.apache.fineract.batch.command.internal.ApproveLoanCommandStrategy;
 import org.apache.fineract.batch.command.internal.ApproveLoanRescheduleCommandStrategy;
 import org.apache.fineract.batch.command.internal.CollectChargesByLoanExternalIdCommandStrategy;
@@ -44,8 +45,22 @@ import org.apache.fineract.batch.command.internal.CreateLoanRescheduleRequestCom
 import org.apache.fineract.batch.command.internal.CreateSavingsAccountChargeCommandStrategy;
 import org.apache.fineract.batch.command.internal.CreateTransactionByLoanExternalIdCommandStrategy;
 import org.apache.fineract.batch.command.internal.CreateTransactionLoanCommandStrategy;
+import org.apache.fineract.batch.command.internal.CreateWorkingCapitalLoanBreachActionByLoanExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.CreateWorkingCapitalLoanBreachActionCommandStrategy;
+import org.apache.fineract.batch.command.internal.CreateWorkingCapitalLoanDelinquencyActionByLoanExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.CreateWorkingCapitalLoanDelinquencyActionCommandStrategy;
+import org.apache.fineract.batch.command.internal.CreateWorkingCapitalLoanNearBreachActionByLoanExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.CreateWorkingCapitalLoanNearBreachActionCommandStrategy;
+import org.apache.fineract.batch.command.internal.CreateWorkingCapitalTransactionByLoanExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.CreateWorkingCapitalTransactionLoanCommandStrategy;
+import org.apache.fineract.batch.command.internal.DeleteWorkingCapitalLoanApplicationByExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.DeleteWorkingCapitalLoanApplicationCommandStrategy;
 import org.apache.fineract.batch.command.internal.DisburseLoanCommandStrategy;
 import org.apache.fineract.batch.command.internal.DisburseToSavingsCommandStrategy;
+import org.apache.fineract.batch.command.internal.ExecuteWorkingCapitalLoanTransactionCommandByLoanExternalIdTransactionExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.ExecuteWorkingCapitalLoanTransactionCommandByLoanExternalIdTransactionIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.ExecuteWorkingCapitalLoanTransactionCommandByLoanIdTransactionExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.ExecuteWorkingCapitalLoanTransactionCommandByLoanIdTransactionIdCommandStrategy;
 import org.apache.fineract.batch.command.internal.GetChargeByChargeExternalIdCommandStrategy;
 import org.apache.fineract.batch.command.internal.GetChargeByIdCommandStrategy;
 import org.apache.fineract.batch.command.internal.GetDatatableEntryByAppTableIdAndDataTableIdCommandStrategy;
@@ -57,10 +72,24 @@ import org.apache.fineract.batch.command.internal.GetLoanTransactionByExternalId
 import org.apache.fineract.batch.command.internal.GetLoanTransactionByIdCommandStrategy;
 import org.apache.fineract.batch.command.internal.GetReagePreviewByLoanExternalIdCommandStrategy;
 import org.apache.fineract.batch.command.internal.GetReagePreviewByLoanIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.GetWorkingCapitalLoanBreachScheduleByLoanIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.GetWorkingCapitalLoanByExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.GetWorkingCapitalLoanByIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.GetWorkingCapitalLoanDelinquencyRangeScheduleByLoanIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.GetWorkingCapitalLoanTransactionByExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.GetWorkingCapitalLoanTransactionByExternalLoanIdAndTransactionIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.GetWorkingCapitalLoanTransactionByIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.GetWorkingCapitalLoanTransactionByLoanIdAndExternalTransactionIdCommandStrategy;
 import org.apache.fineract.batch.command.internal.LoanStateTransistionsByExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.MarkWorkingCapitalLoanAsFraudByExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.MarkWorkingCapitalLoanAsFraudCommandStrategy;
 import org.apache.fineract.batch.command.internal.ModifyLoanApplicationCommandStrategy;
+import org.apache.fineract.batch.command.internal.ModifyWorkingCapitalLoanApplicationByExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.ModifyWorkingCapitalLoanApplicationCommandStrategy;
 import org.apache.fineract.batch.command.internal.PaySavingsAccountChargeCommandStrategy;
 import org.apache.fineract.batch.command.internal.RejectLoanRescheduleCommandStrategy;
+import org.apache.fineract.batch.command.internal.StateTransitionWorkingCapitalLoanByExternalIdCommandStrategy;
+import org.apache.fineract.batch.command.internal.StateTransitionWorkingCapitalLoanCommandStrategy;
 import org.apache.fineract.batch.command.internal.UnknownCommandStrategy;
 import org.apache.fineract.batch.command.internal.UpdateClientCommandStrategy;
 import org.apache.fineract.batch.command.internal.UpdateDatatableEntryOneToManyCommandStrategy;
@@ -246,7 +275,115 @@ public class CommandStrategyProviderTest {
                         HttpMethod.GET, "getReagePreviewByLoanExternalIdCommandStrategy",
                         mock(GetReagePreviewByLoanExternalIdCommandStrategy.class)),
                 Arguments.of("accounttransfers", HttpMethod.POST, "createAccountTransferCommandStrategy",
-                        mock(CreateAccountTransferCommandStrategy.class)));
+                        mock(CreateAccountTransferCommandStrategy.class)),
+                Arguments.of("working-capital-loans", HttpMethod.POST, "applyWorkingCapitalLoanCommandStrategy",
+                        mock(ApplyWorkingCapitalLoanCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123", HttpMethod.PUT, "modifyWorkingCapitalLoanApplicationCommandStrategy",
+                        mock(ModifyWorkingCapitalLoanApplicationCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123?command=approve", HttpMethod.PUT,
+                        "modifyWorkingCapitalLoanApplicationCommandStrategy",
+                        mock(ModifyWorkingCapitalLoanApplicationCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1", HttpMethod.PUT,
+                        "modifyWorkingCapitalLoanApplicationByExternalIdCommandStrategy",
+                        mock(ModifyWorkingCapitalLoanApplicationByExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123", HttpMethod.DELETE, "deleteWorkingCapitalLoanApplicationCommandStrategy",
+                        mock(DeleteWorkingCapitalLoanApplicationCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1", HttpMethod.DELETE,
+                        "deleteWorkingCapitalLoanApplicationByExternalIdCommandStrategy",
+                        mock(DeleteWorkingCapitalLoanApplicationByExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123?command=approve", HttpMethod.POST,
+                        "stateTransitionWorkingCapitalLoanCommandStrategy", mock(StateTransitionWorkingCapitalLoanCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1?command=approve", HttpMethod.POST,
+                        "stateTransitionWorkingCapitalLoanByExternalIdCommandStrategy",
+                        mock(StateTransitionWorkingCapitalLoanByExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/transactions?command=repayment", HttpMethod.POST,
+                        "createWorkingCapitalTransactionLoanCommandStrategy",
+                        mock(CreateWorkingCapitalTransactionLoanCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/transactions?command=repayment",
+                        HttpMethod.POST, "createWorkingCapitalTransactionByLoanExternalIdCommandStrategy",
+                        mock(CreateWorkingCapitalTransactionByLoanExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123", HttpMethod.GET, "getWorkingCapitalLoanByIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanByIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123?associations=all", HttpMethod.GET, "getWorkingCapitalLoanByIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanByIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1", HttpMethod.GET,
+                        "getWorkingCapitalLoanByExternalIdCommandStrategy", mock(GetWorkingCapitalLoanByExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1?associations=all", HttpMethod.GET,
+                        "getWorkingCapitalLoanByExternalIdCommandStrategy", mock(GetWorkingCapitalLoanByExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/transactions/456", HttpMethod.GET,
+                        "getWorkingCapitalLoanTransactionByIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanTransactionByIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/transactions/456?command=adjust", HttpMethod.POST,
+                        "executeWorkingCapitalLoanTransactionCommandByLoanIdTransactionIdCommandStrategy",
+                        mock(ExecuteWorkingCapitalLoanTransactionCommandByLoanIdTransactionIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/transactions/external-id/7dfad438-2319-48ce-8520-10a62801e9ab?command=adjust",
+                        HttpMethod.POST, "executeWorkingCapitalLoanTransactionCommandByLoanIdTransactionExternalIdCommandStrategy",
+                        mock(ExecuteWorkingCapitalLoanTransactionCommandByLoanIdTransactionExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/123/transactions/456?command=adjust", HttpMethod.POST,
+                        "executeWorkingCapitalLoanTransactionCommandByLoanExternalIdTransactionIdCommandStrategy",
+                        mock(ExecuteWorkingCapitalLoanTransactionCommandByLoanExternalIdTransactionIdCommandStrategy.class)),
+                Arguments.of(
+                        "working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/transactions/external-id/7dfad438-2319-48ce-8520-10a62801e9ab?command=adjust",
+                        HttpMethod.POST, "executeWorkingCapitalLoanTransactionCommandByLoanExternalIdTransactionExternalIdCommandStrategy",
+                        mock(ExecuteWorkingCapitalLoanTransactionCommandByLoanExternalIdTransactionExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/transactions/456?fields=id", HttpMethod.GET,
+                        "getWorkingCapitalLoanTransactionByIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanTransactionByIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/transactions/external-id/7dfad438-2319-48ce-8520-10a62801e9ab", HttpMethod.GET,
+                        "getWorkingCapitalLoanTransactionByLoanIdAndExternalTransactionIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanTransactionByLoanIdAndExternalTransactionIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/transactions/external-id/7dfad438-2319-48ce-8520-10a62801e9ab?fields=id",
+                        HttpMethod.GET, "getWorkingCapitalLoanTransactionByLoanIdAndExternalTransactionIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanTransactionByLoanIdAndExternalTransactionIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/transactions/456", HttpMethod.GET,
+                        "getWorkingCapitalLoanTransactionByExternalLoanIdAndTransactionIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanTransactionByExternalLoanIdAndTransactionIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/transactions/456?fields=id",
+                        HttpMethod.GET, "getWorkingCapitalLoanTransactionByExternalLoanIdAndTransactionIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanTransactionByExternalLoanIdAndTransactionIdCommandStrategy.class)),
+                Arguments.of(
+                        "working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/transactions/external-id/7dfad438-2319-48ce-8520-10a62801e9ab",
+                        HttpMethod.GET, "getWorkingCapitalLoanTransactionByExternalIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanTransactionByExternalIdCommandStrategy.class)),
+                Arguments.of(
+                        "working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/transactions/external-id/7dfad438-2319-48ce-8520-10a62801e9ab?fields=id",
+                        HttpMethod.GET, "getWorkingCapitalLoanTransactionByExternalIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanTransactionByExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/breach-schedule", HttpMethod.GET,
+                        "getWorkingCapitalLoanBreachScheduleByLoanIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanBreachScheduleByLoanIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/breach-schedule?fields=id", HttpMethod.GET,
+                        "getWorkingCapitalLoanBreachScheduleByLoanIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanBreachScheduleByLoanIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/delinquency-range-schedule", HttpMethod.GET,
+                        "getWorkingCapitalLoanDelinquencyRangeScheduleByLoanIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanDelinquencyRangeScheduleByLoanIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/delinquency-range-schedule?fields=id", HttpMethod.GET,
+                        "getWorkingCapitalLoanDelinquencyRangeScheduleByLoanIdCommandStrategy",
+                        mock(GetWorkingCapitalLoanDelinquencyRangeScheduleByLoanIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/mark-as-fraud", HttpMethod.PUT, "markWorkingCapitalLoanAsFraudCommandStrategy",
+                        mock(MarkWorkingCapitalLoanAsFraudCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/mark-as-fraud", HttpMethod.PUT,
+                        "markWorkingCapitalLoanAsFraudByExternalIdCommandStrategy",
+                        mock(MarkWorkingCapitalLoanAsFraudByExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/breach-actions", HttpMethod.POST,
+                        "createWorkingCapitalLoanBreachActionCommandStrategy",
+                        mock(CreateWorkingCapitalLoanBreachActionCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/breach-actions", HttpMethod.POST,
+                        "createWorkingCapitalLoanBreachActionByLoanExternalIdCommandStrategy",
+                        mock(CreateWorkingCapitalLoanBreachActionByLoanExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/delinquency-actions", HttpMethod.POST,
+                        "createWorkingCapitalLoanDelinquencyActionCommandStrategy",
+                        mock(CreateWorkingCapitalLoanDelinquencyActionCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/delinquency-actions", HttpMethod.POST,
+                        "createWorkingCapitalLoanDelinquencyActionByLoanExternalIdCommandStrategy",
+                        mock(CreateWorkingCapitalLoanDelinquencyActionByLoanExternalIdCommandStrategy.class)),
+                Arguments.of("working-capital-loans/123/near-breach-actions", HttpMethod.POST,
+                        "createWorkingCapitalLoanNearBreachActionCommandStrategy",
+                        mock(CreateWorkingCapitalLoanNearBreachActionCommandStrategy.class)),
+                Arguments.of("working-capital-loans/external-id/8dfad438-2319-48ce-8520-10a62801e9a1/near-breach-actions", HttpMethod.POST,
+                        "createWorkingCapitalLoanNearBreachActionByLoanExternalIdCommandStrategy",
+                        mock(CreateWorkingCapitalLoanNearBreachActionByLoanExternalIdCommandStrategy.class)));
     }
 
     /**

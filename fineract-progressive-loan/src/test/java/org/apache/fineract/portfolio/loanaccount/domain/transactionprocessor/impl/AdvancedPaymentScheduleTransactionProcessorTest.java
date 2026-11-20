@@ -25,6 +25,7 @@ import static org.apache.fineract.portfolio.loanproduct.domain.AllocationType.PE
 import static org.apache.fineract.portfolio.loanproduct.domain.AllocationType.PRINCIPAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -33,10 +34,13 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -44,13 +48,17 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.fineract.infrastructure.businessdate.domain.BusinessDateType;
 import org.apache.fineract.infrastructure.configuration.domain.ConfigurationDomainService;
 import org.apache.fineract.infrastructure.core.domain.ActionContext;
 import org.apache.fineract.infrastructure.core.domain.FineractPlatformTenant;
+import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.ExternalIdFactory;
 import org.apache.fineract.infrastructure.core.service.ThreadLocalContextUtil;
 import org.apache.fineract.organisation.monetary.domain.MonetaryCurrency;
@@ -60,6 +68,7 @@ import org.apache.fineract.portfolio.loanaccount.data.TransactionChangeData;
 import org.apache.fineract.portfolio.loanaccount.domain.ChangedTransactionDetail;
 import org.apache.fineract.portfolio.loanaccount.domain.Loan;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanCharge;
+import org.apache.fineract.portfolio.loanaccount.domain.LoanChargeOffBehaviour;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanChargePaidBy;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanCreditAllocationRule;
 import org.apache.fineract.portfolio.loanaccount.domain.LoanInterestRecalculationDetails;
@@ -77,14 +86,21 @@ import org.apache.fineract.portfolio.loanaccount.serialization.LoanChargeValidat
 import org.apache.fineract.portfolio.loanaccount.service.InterestRefundService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanBalanceService;
 import org.apache.fineract.portfolio.loanaccount.service.LoanChargeService;
+import org.apache.fineract.portfolio.loanaccount.service.LoanMeetingCalendarService;
 import org.apache.fineract.portfolio.loanaccount.service.schedule.LoanScheduleComponent;
 import org.apache.fineract.portfolio.loanproduct.calc.EMICalculator;
+import org.apache.fineract.portfolio.loanproduct.calc.data.PeriodDueDetails;
 import org.apache.fineract.portfolio.loanproduct.calc.data.ProgressiveLoanInterestScheduleModel;
+import org.apache.fineract.portfolio.loanproduct.calc.data.RepaymentPeriod;
 import org.apache.fineract.portfolio.loanproduct.domain.AllocationType;
+import org.apache.fineract.portfolio.loanproduct.domain.CreditAllocationStrategy;
 import org.apache.fineract.portfolio.loanproduct.domain.CreditAllocationTransactionType;
+import org.apache.fineract.portfolio.loanproduct.domain.FutureInstallmentAllocationRule;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProductRelatedDetail;
 import org.apache.fineract.portfolio.loanproduct.domain.PaymentAllocationTransactionType;
 import org.apache.fineract.portfolio.loanproduct.domain.PaymentAllocationType;
+import org.apache.fineract.portfolio.loanproduct.domain.RecalculationFrequencyType;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -96,12 +112,13 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.lang.NonNull;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class AdvancedPaymentScheduleTransactionProcessorTest {
 
     private final LocalDate transactionDate = LocalDate.of(2023, 7, 11);
+    private static final LocalDate JAN_15 = LocalDate.of(2026, 1, 15);
     private static final MonetaryCurrency MONETARY_CURRENCY = new MonetaryCurrency("USD", 2, 1);
     private static final MockedStatic<MoneyHelper> MONEY_HELPER = mockStatic(MoneyHelper.class);
     private AdvancedPaymentScheduleTransactionProcessor underTest;
@@ -120,10 +137,13 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
 
     @BeforeEach
     public void setUp() {
+        // The EMI calculator mock is shared by every test in this class, so its stubs and recorded invocations must not
+        // leak from one test to the next
+        Mockito.reset(emiCalculator);
         underTest = new AdvancedPaymentScheduleTransactionProcessor(emiCalculator, Mockito.mock(InterestRefundService.class),
                 Mockito.mock(ExternalIdFactory.class), Mockito.mock(LoanScheduleComponent.class), Mockito.mock(LoanChargeValidator.class),
                 Mockito.mock(LoanBalanceService.class), Mockito.mock(LoanChargeService.class), Mockito.mock(ScheduledDateGenerator.class),
-                Mockito.mock(ConfigurationDomainService.class));
+                Mockito.mock(ConfigurationDomainService.class), Mockito.mock(LoanMeetingCalendarService.class));
 
         ThreadLocalContextUtil.setTenant(new FineractPlatformTenant(1L, "default", "Default", "Asia/Kolkata", null));
         ThreadLocalContextUtil.setActionContext(ActionContext.DEFAULT);
@@ -280,8 +300,8 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         Loan loan = mock(Loan.class);
         LoanTransaction chargebackTransaction = createChargebackTransaction(loan, 25.0);
 
-        LoanCreditAllocationRule mockCreditAllocationRule = createMockCreditAllocationRule(PRINCIPAL, PENALTY, FEE, INTEREST);
-        when(loan.getCreditAllocationRules()).thenReturn(List.of(mockCreditAllocationRule));
+        LoanCreditAllocationRule creditAllocationRule = createRuleBasedCreditAllocationRule(PRINCIPAL, PENALTY, FEE, INTEREST);
+        when(loan.getCreditAllocationRules()).thenReturn(List.of(creditAllocationRule));
         LoanTransaction repayment = createRepayment(loan, chargebackTransaction, 10, 0, 20, 5);
         lenient().when(loan.getLoanTransactions()).thenReturn(List.of(repayment));
 
@@ -333,13 +353,82 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
     }
 
     @Test
+    public void testProcessCreditTransactionWithPrincipalOnlyAllocationRule() {
+        // given
+        Loan loan = mock(Loan.class);
+        LoanTransaction chargebackTransaction = createChargebackTransaction(loan, 25.0);
+
+        LoanCreditAllocationRule creditAllocationRule = createPrincipalOnlyCreditAllocationRule();
+        when(loan.getCreditAllocationRules()).thenReturn(List.of(creditAllocationRule));
+        LoanTransaction repayment = createRepayment(loan, chargebackTransaction, 10, 0, 20, 5);
+        lenient().when(loan.getLoanTransactions()).thenReturn(List.of(repayment));
+
+        MoneyHolder overpaymentHolder = new MoneyHolder(Money.zero(MONETARY_CURRENCY));
+        List<LoanRepaymentScheduleInstallment> installments = new ArrayList<>();
+        LoanRepaymentScheduleInstallment installment = createMockInstallment(LocalDate.of(2023, 1, 31), false);
+        installments.add(installment);
+
+        // when
+        TransactionCtx ctx = new TransactionCtx(MONETARY_CURRENCY, installments, null, overpaymentHolder, null,
+                loan.getActiveLoanTermVariations());
+        underTest.processCreditTransaction(chargebackTransaction, ctx);
+
+        // then the full amount is recognized as principal, regardless of the original repayment portions
+        Mockito.verify(installment, times(1)).addToCreditedPrincipal(new BigDecimal("25.00"));
+        ArgumentCaptor<Money> moneyCaptor = ArgumentCaptor.forClass(Money.class);
+        Mockito.verify(installment, times(1)).addToPrincipal(eq(LocalDate.of(2023, 1, 1)), moneyCaptor.capture());
+        assertEquals(0, moneyCaptor.getValue().getAmount().compareTo(BigDecimal.valueOf(25.0)));
+        Mockito.verify(installment, never()).addToCreditedFee(any());
+        Mockito.verify(installment, never()).addToCreditedPenalty(any());
+        Mockito.verify(installment, never()).addToCreditedInterest(any());
+
+        verifyChargebackComponents(chargebackTransaction, 25.0, 0.0, 0.0, 0.0);
+    }
+
+    @Test
+    public void testProcessCreditTransactionWithEmiCalculatorAndPrincipalOnlyAllocationRule() {
+        // given
+        Loan loan = mock(Loan.class);
+        when(loan.isInterestRecalculationEnabled()).thenReturn(true);
+        LoanTransaction chargebackTransaction = createChargebackTransaction(loan, 25.0);
+
+        LoanCreditAllocationRule creditAllocationRule = createPrincipalOnlyCreditAllocationRule();
+        when(loan.getCreditAllocationRules()).thenReturn(List.of(creditAllocationRule));
+        LoanTransaction repayment = createRepayment(loan, chargebackTransaction, 10, 0, 20, 5);
+        lenient().when(loan.getLoanTransactions()).thenReturn(List.of(repayment));
+
+        List<LoanRepaymentScheduleInstallment> installments = new ArrayList<>();
+        LoanRepaymentScheduleInstallment installment = createMockInstallment(LocalDate.of(2023, 1, 31), false);
+        lenient().when(installment.getFromDate()).thenReturn(LocalDate.of(2023, 1, 1));
+        installments.add(installment);
+
+        ProgressiveLoanInterestScheduleModel model = mock(ProgressiveLoanInterestScheduleModel.class);
+        when(model.getMaturityDate()).thenReturn(LocalDate.of(2023, 1, 31));
+
+        // when
+        ProgressiveTransactionCtx ctx = new ProgressiveTransactionCtx(MONETARY_CURRENCY, installments, Set.of(),
+                new MoneyHolder(Money.zero(MONETARY_CURRENCY)), null, model, loan.getActiveLoanTermVariations());
+        underTest.processCreditTransaction(chargebackTransaction, ctx);
+
+        // then the full amount is credited as principal
+        ArgumentCaptor<Money> principalCaptor = ArgumentCaptor.forClass(Money.class);
+        Mockito.verify(emiCalculator, times(1)).creditPrincipal(eq(model), eq(LocalDate.of(2023, 1, 1)), principalCaptor.capture());
+        assertEquals(0, principalCaptor.getValue().getAmount().compareTo(BigDecimal.valueOf(25.0)));
+        Mockito.verify(emiCalculator, never()).creditInterest(any(), any(), any());
+        Mockito.verify(installment, never()).addToCreditedFee(any());
+        Mockito.verify(installment, never()).addToCreditedPenalty(any());
+
+        verifyChargebackComponents(chargebackTransaction, 25.0, 0.0, 0.0, 0.0);
+    }
+
+    @Test
     public void testProcessCreditTransactionWithAllocationRulePenaltyFeePrincipalInterest() {
         // given
         Loan loan = mock(Loan.class);
         LoanTransaction chargebackTransaction = createChargebackTransaction(loan, 25.0);
 
-        LoanCreditAllocationRule mockCreditAllocationRule = createMockCreditAllocationRule(PENALTY, FEE, PRINCIPAL, INTEREST);
-        when(loan.getCreditAllocationRules()).thenReturn(List.of(mockCreditAllocationRule));
+        LoanCreditAllocationRule creditAllocationRule = createRuleBasedCreditAllocationRule(PENALTY, FEE, PRINCIPAL, INTEREST);
+        when(loan.getCreditAllocationRules()).thenReturn(List.of(creditAllocationRule));
         LoanTransaction repayment = createRepayment(loan, chargebackTransaction, 10, 0, 20, 5);
         lenient().when(loan.getLoanTransactions()).thenReturn(List.of(repayment));
 
@@ -388,8 +477,8 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         Loan loan = mock(Loan.class);
         LoanTransaction chargebackTransaction = createChargebackTransaction(loan, 25.0);
 
-        LoanCreditAllocationRule mockCreditAllocationRule = createMockCreditAllocationRule(PRINCIPAL, PENALTY, FEE, INTEREST);
-        when(loan.getCreditAllocationRules()).thenReturn(List.of(mockCreditAllocationRule));
+        LoanCreditAllocationRule creditAllocationRule = createRuleBasedCreditAllocationRule(PRINCIPAL, PENALTY, FEE, INTEREST);
+        when(loan.getCreditAllocationRules()).thenReturn(List.of(creditAllocationRule));
         LoanTransaction repayment = createRepayment(loan, chargebackTransaction, 10, 0, 20, 5);
         lenient().when(loan.getLoanTransactions()).thenReturn(List.of(repayment));
 
@@ -588,6 +677,202 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         assertEquals(0, newInstallment.getPrincipal(currency).getAmount().compareTo(postMaturityDisbursementAmount));
     }
 
+    /**
+     * A Merchant Issued Refund allocated with the LAST_INSTALLMENT rule picks the highest numbered installment which is
+     * still due after the transaction date. On a loan which carries an additional installment - inserted by an earlier
+     * chargeback, credit balance refund or due date charge - and whose maturity date was later pushed beyond that
+     * installment by a re-age, the highest numbered installment is the additional one. Additional installments are
+     * filtered out of the interest schedule model, so they must be paid through plain payment allocation instead of
+     * being handed to the EMI calculator, which would fail to resolve them to a repayment period.
+     */
+    @Test
+    public void testMerchantIssuedRefundWithLastInstallmentRuleDoesNotPayAdditionalInstallmentThroughEmiCalculator() {
+        final MonetaryCurrency currency = MONETARY_CURRENCY;
+        final LocalDate disbursementDate = LocalDate.of(2026, 4, 21);
+        final LocalDate refundDate = LocalDate.of(2026, 6, 10);
+        // The re-age extended the schedule well beyond the additional installment below
+        final LocalDate maturityDate = LocalDate.of(2027, 4, 10);
+        final BigDecimal refundAmount = BigDecimal.valueOf(100.00);
+        // Money.of() reads the statically mocked MoneyHelper, so it must not be evaluated inside a when() call
+        final Money refundMoney = Money.of(currency, refundAmount);
+        final Money zeroMoney = Money.zero(currency);
+
+        final Loan loan = mock(Loan.class);
+        final LoanProductRelatedDetail loanProductRelatedDetail = mock(LoanProductRelatedDetail.class);
+        when(loanProductRelatedDetail.getLoanScheduleProcessingType()).thenReturn(LoanScheduleProcessingType.HORIZONTAL);
+        when(loan.getLoanProductRelatedDetail()).thenReturn(loanProductRelatedDetail);
+        when(loan.getCurrency()).thenReturn(currency);
+        when(loan.isInterestBearingAndInterestRecalculationEnabled()).thenReturn(Boolean.TRUE);
+        final LoanInterestRecalculationDetails interestRecalculationDetails = mock(LoanInterestRecalculationDetails.class);
+        when(interestRecalculationDetails.disallowInterestCalculationOnPastDue()).thenReturn(Boolean.FALSE);
+        // Only consulted on the EMI calculator branch, which the additional installment must not take
+        lenient().when(interestRecalculationDetails.getRestFrequencyType()).thenReturn(RecalculationFrequencyType.DAILY);
+        when(loan.getLoanInterestRecalculationDetails()).thenReturn(interestRecalculationDetails);
+
+        final LoanPaymentAllocationRule merchantIssuedRefundRule = mock(LoanPaymentAllocationRule.class);
+        when(merchantIssuedRefundRule.getTransactionType()).thenReturn(PaymentAllocationTransactionType.MERCHANT_ISSUED_REFUND);
+        when(merchantIssuedRefundRule.getAllocationTypes()).thenReturn(List.of(PaymentAllocationType.IN_ADVANCE_PRINCIPAL));
+        when(merchantIssuedRefundRule.getFutureInstallmentAllocationRule()).thenReturn(FutureInstallmentAllocationRule.LAST_INSTALLMENT);
+        // getAllocationRule() resolves the default rule eagerly through orElse(), so the product needs to carry one
+        final LoanPaymentAllocationRule defaultRule = mock(LoanPaymentAllocationRule.class);
+        when(defaultRule.getTransactionType()).thenReturn(PaymentAllocationTransactionType.DEFAULT);
+        when(loan.getPaymentAllocationRules()).thenReturn(List.of(defaultRule, merchantIssuedRefundRule));
+
+        // Down payment, one settled period, one re-aged period still open, and the leftover additional installment
+        final LoanRepaymentScheduleInstallment downPayment = new LoanRepaymentScheduleInstallment(loan, 1, disbursementDate,
+                disbursementDate, BigDecimal.valueOf(150.00), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false, null,
+                BigDecimal.ZERO, true);
+        final LoanRepaymentScheduleInstallment settledInstallment = new LoanRepaymentScheduleInstallment(loan, 2, disbursementDate,
+                LocalDate.of(2026, 5, 21), BigDecimal.valueOf(150.00), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false, null,
+                BigDecimal.ZERO);
+        final LoanRepaymentScheduleInstallment reAgedInstallment = LoanRepaymentScheduleInstallment.newReAgedInstallment(loan, 3,
+                LocalDate.of(2026, 5, 21), LocalDate.of(2026, 7, 10), BigDecimal.valueOf(300.00), BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO);
+        final LoanRepaymentScheduleInstallment additionalInstallment = new LoanRepaymentScheduleInstallment(loan, 4,
+                LocalDate.of(2026, 8, 21), LocalDate.of(2026, 9, 15), refundAmount, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                false, null, BigDecimal.ZERO);
+        additionalInstallment.markAsAdditional();
+
+        final List<LoanRepaymentScheduleInstallment> installments = new ArrayList<>(
+                List.of(downPayment, settledInstallment, reAgedInstallment, additionalInstallment));
+
+        final LoanTransaction merchantIssuedRefund = mock(LoanTransaction.class);
+        when(merchantIssuedRefund.getTypeOf()).thenReturn(LoanTransactionType.MERCHANT_ISSUED_REFUND);
+        when(merchantIssuedRefund.getLoan()).thenReturn(loan);
+        when(merchantIssuedRefund.getAmount()).thenReturn(refundAmount);
+        when(merchantIssuedRefund.getAmount(currency)).thenReturn(refundMoney);
+        when(merchantIssuedRefund.getTransactionDate()).thenReturn(refundDate);
+        when(merchantIssuedRefund.isBefore(any(LocalDate.class))).thenAnswer(i -> refundDate.isBefore(i.getArgument(0)));
+        when(merchantIssuedRefund.isAfter(any(LocalDate.class))).thenAnswer(i -> refundDate.isAfter(i.getArgument(0)));
+        lenient().when(merchantIssuedRefund.isOn(any(LocalDate.class))).thenAnswer(i -> refundDate.isEqual(i.getArgument(0)));
+
+        // The maturity date check is lenient on purpose: the additional installment check short circuits before it, and
+        // it is exactly the check which used to let the additional installment through once a re-age moved the maturity
+        // date past its due date
+        final ProgressiveLoanInterestScheduleModel model = mock(ProgressiveLoanInterestScheduleModel.class);
+        lenient().when(model.getMaturityDate()).thenReturn(maturityDate);
+
+        // Reproduce what the real calculator does when it cannot resolve the installment to a repayment period
+        lenient().when(emiCalculator.getDueAmounts(any(), any(), any(), any())).thenThrow(new NoSuchElementException("No value present"));
+
+        final ProgressiveTransactionCtx ctx = new ProgressiveTransactionCtx(currency, installments, Set.of(), new MoneyHolder(zeroMoney),
+                mock(ChangedTransactionDetail.class), model, zeroMoney, loan.getActiveLoanTermVariations());
+
+        underTest.processLatestTransaction(merchantIssuedRefund, ctx);
+
+        // The additional installment must never reach the EMI calculator
+        Mockito.verify(emiCalculator, Mockito.never()).getDueAmounts(any(), any(), any(), any());
+        Mockito.verify(emiCalculator, Mockito.never()).payPrincipal(any(), any(), any(), any(), any());
+        assertTrue(ctx.getSkipRepaymentScheduleInstallments().contains(additionalInstallment));
+
+        // ... and the refund still gets allocated to it
+        assertEquals(0, additionalInstallment.getPrincipalCompleted(currency).getAmount().compareTo(refundAmount));
+        assertEquals(0, reAgedInstallment.getPrincipalCompleted(currency).getAmount().compareTo(BigDecimal.ZERO));
+    }
+
+    /**
+     * When the recalculated-till-date view of the interest schedule model diverges from the repayment schedule by a
+     * rounding cent (e.g. the last re-aged period carries a remainder-cent EMI adjustment which the recalculated copy
+     * re-derives away), a LAST_INSTALLMENT allocation used to ping-pong forever: it paid the recalculated amount, the
+     * model sync restored the outstanding cent on the installment, the installment was re-selected with nothing left to
+     * allocate, and the LoopGuard aborted the whole transaction with an IllegalStateException. The allocation loop must
+     * instead mark the starved installment as skipped and move on to the remaining installments.
+     */
+    @Test
+    public void testMerchantIssuedRefundWithLastInstallmentRuleTerminatesWhenModelDuesDivergeByARoundingCent() {
+        final MonetaryCurrency currency = MONETARY_CURRENCY;
+        final LocalDate disbursementDate = LocalDate.of(2026, 4, 21);
+        final LocalDate refundDate = LocalDate.of(2026, 6, 10);
+        final LocalDate maturityDate = LocalDate.of(2027, 4, 10);
+        final BigDecimal refundAmount = BigDecimal.valueOf(100.00);
+        // Money.of() reads the statically mocked MoneyHelper, so it must not be evaluated inside a when() call
+        final Money refundMoney = Money.of(currency, refundAmount);
+        final Money zeroMoney = Money.zero(currency);
+        final Money lastPeriodModelDuePrincipal = Money.of(currency, BigDecimal.valueOf(45.00));
+        final Money lastPeriodModelDueInterest = Money.of(currency, BigDecimal.valueOf(0.42));
+        final Money lastPeriodRecalculatedEmi = Money.of(currency, BigDecimal.valueOf(45.41));
+        // One rounding cent below the model dues the installment is synced from
+        final Money lastPeriodRecalculatedDuePrincipal = Money.of(currency, BigDecimal.valueOf(44.99));
+        final Money middlePeriodDuePrincipal = Money.of(currency, BigDecimal.valueOf(300.00));
+
+        final Loan loan = mock(Loan.class);
+        final LoanProductRelatedDetail loanProductRelatedDetail = mock(LoanProductRelatedDetail.class);
+        when(loanProductRelatedDetail.getLoanScheduleProcessingType()).thenReturn(LoanScheduleProcessingType.HORIZONTAL);
+        when(loan.getLoanProductRelatedDetail()).thenReturn(loanProductRelatedDetail);
+        when(loan.getCurrency()).thenReturn(currency);
+        when(loan.isInterestBearingAndInterestRecalculationEnabled()).thenReturn(Boolean.TRUE);
+        final LoanInterestRecalculationDetails interestRecalculationDetails = mock(LoanInterestRecalculationDetails.class);
+        when(interestRecalculationDetails.disallowInterestCalculationOnPastDue()).thenReturn(Boolean.FALSE);
+        lenient().when(interestRecalculationDetails.getRestFrequencyType()).thenReturn(RecalculationFrequencyType.DAILY);
+        when(loan.getLoanInterestRecalculationDetails()).thenReturn(interestRecalculationDetails);
+
+        final LoanPaymentAllocationRule merchantIssuedRefundRule = mock(LoanPaymentAllocationRule.class);
+        when(merchantIssuedRefundRule.getTransactionType()).thenReturn(PaymentAllocationTransactionType.MERCHANT_ISSUED_REFUND);
+        when(merchantIssuedRefundRule.getAllocationTypes()).thenReturn(List.of(PaymentAllocationType.IN_ADVANCE_PRINCIPAL));
+        when(merchantIssuedRefundRule.getFutureInstallmentAllocationRule()).thenReturn(FutureInstallmentAllocationRule.LAST_INSTALLMENT);
+        final LoanPaymentAllocationRule defaultRule = mock(LoanPaymentAllocationRule.class);
+        when(defaultRule.getTransactionType()).thenReturn(PaymentAllocationTransactionType.DEFAULT);
+        when(loan.getPaymentAllocationRules()).thenReturn(List.of(defaultRule, merchantIssuedRefundRule));
+
+        // Down payment, one settled period and two open re-aged periods; the refund targets the last one
+        final LoanRepaymentScheduleInstallment downPayment = new LoanRepaymentScheduleInstallment(loan, 1, disbursementDate,
+                disbursementDate, BigDecimal.valueOf(150.00), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false, null,
+                BigDecimal.ZERO, true);
+        final LoanRepaymentScheduleInstallment settledInstallment = new LoanRepaymentScheduleInstallment(loan, 2, disbursementDate,
+                LocalDate.of(2026, 5, 21), BigDecimal.valueOf(150.00), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, false, null,
+                BigDecimal.ZERO);
+        final LoanRepaymentScheduleInstallment middleReAgedInstallment = LoanRepaymentScheduleInstallment.newReAgedInstallment(loan, 3,
+                LocalDate.of(2026, 5, 21), LocalDate.of(2026, 7, 10), BigDecimal.valueOf(300.00), BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO);
+        final LoanRepaymentScheduleInstallment lastReAgedInstallment = LoanRepaymentScheduleInstallment.newReAgedInstallment(loan, 4,
+                LocalDate.of(2027, 3, 10), LocalDate.of(2027, 4, 10), BigDecimal.valueOf(45.00), BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO);
+
+        final List<LoanRepaymentScheduleInstallment> installments = new ArrayList<>(
+                List.of(downPayment, settledInstallment, middleReAgedInstallment, lastReAgedInstallment));
+
+        final LoanTransaction merchantIssuedRefund = mock(LoanTransaction.class);
+        when(merchantIssuedRefund.getTypeOf()).thenReturn(LoanTransactionType.MERCHANT_ISSUED_REFUND);
+        when(merchantIssuedRefund.getLoan()).thenReturn(loan);
+        when(merchantIssuedRefund.getAmount()).thenReturn(refundAmount);
+        when(merchantIssuedRefund.getAmount(currency)).thenReturn(refundMoney);
+        when(merchantIssuedRefund.getTransactionDate()).thenReturn(refundDate);
+        when(merchantIssuedRefund.isBefore(any(LocalDate.class))).thenAnswer(i -> refundDate.isBefore(i.getArgument(0)));
+        when(merchantIssuedRefund.isAfter(any(LocalDate.class))).thenAnswer(i -> refundDate.isAfter(i.getArgument(0)));
+        lenient().when(merchantIssuedRefund.isOn(any(LocalDate.class))).thenAnswer(i -> refundDate.isEqual(i.getArgument(0)));
+
+        // The model still carries the contractual dues of the last re-aged period; every EMI-branch payment triggers a
+        // sync which restores them on the installment, re-creating the one-cent outstanding
+        final RepaymentPeriod lastModelPeriod = mock(RepaymentPeriod.class);
+        lenient().when(lastModelPeriod.getFromDate()).thenReturn(LocalDate.of(2027, 3, 10));
+        lenient().when(lastModelPeriod.getDueDate()).thenReturn(LocalDate.of(2027, 4, 10));
+        lenient().when(lastModelPeriod.getDuePrincipal()).thenReturn(lastPeriodModelDuePrincipal);
+        lenient().when(lastModelPeriod.getDueInterest()).thenReturn(lastPeriodModelDueInterest);
+        lenient().when(lastModelPeriod.getCreditedPrincipal()).thenReturn(zeroMoney);
+        lenient().when(lastModelPeriod.getCreditedInterest()).thenReturn(zeroMoney);
+
+        final ProgressiveLoanInterestScheduleModel model = mock(ProgressiveLoanInterestScheduleModel.class);
+        lenient().when(model.getMaturityDate()).thenReturn(maturityDate);
+        lenient().when(model.repaymentPeriods()).thenReturn(List.of(lastModelPeriod));
+
+        // The recalculated-till-date view underpays the last period by one rounding cent
+        lenient().when(emiCalculator.getDueAmounts(any(), eq(LocalDate.of(2027, 3, 10)), eq(LocalDate.of(2027, 4, 10)), any())).thenReturn(
+                new PeriodDueDetails(lastPeriodRecalculatedEmi, lastPeriodRecalculatedDuePrincipal, lastPeriodModelDueInterest));
+        lenient().when(emiCalculator.getDueAmounts(any(), eq(LocalDate.of(2026, 5, 21)), eq(LocalDate.of(2026, 7, 10)), any()))
+                .thenReturn(new PeriodDueDetails(middlePeriodDuePrincipal, middlePeriodDuePrincipal, zeroMoney));
+
+        final ProgressiveTransactionCtx ctx = new ProgressiveTransactionCtx(currency, installments, Set.of(), new MoneyHolder(zeroMoney),
+                mock(ChangedTransactionDetail.class), model, zeroMoney, loan.getActiveLoanTermVariations());
+
+        // Used to spin until "Loop exceeded N iterations" - must now terminate and cascade to the previous installment
+        underTest.processLatestTransaction(merchantIssuedRefund, ctx);
+
+        assertTrue(ctx.getSkipRepaymentScheduleInstallments().contains(lastReAgedInstallment),
+                "the starved installment must be skip-listed so the allocation moves on");
+        assertEquals(0, lastReAgedInstallment.getPrincipalCompleted(currency).getAmount().compareTo(BigDecimal.valueOf(44.99)));
+        assertEquals(0, middleReAgedInstallment.getPrincipalCompleted(currency).getAmount().compareTo(BigDecimal.valueOf(55.01)));
+    }
+
     private LoanRepaymentScheduleInstallment createMockInstallment(LocalDate localDate, boolean isAdditional) {
         LoanRepaymentScheduleInstallment installment = mock(LoanRepaymentScheduleInstallment.class);
         lenient().when(installment.isAdditional()).thenReturn(isAdditional);
@@ -597,12 +882,232 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         return installment;
     }
 
+    @Test
+    public void fixPercentageDueDateChargesSortOrderReturnsOriginalListWhenNoDisbursementExists() {
+        // given
+        ChangeOperation percentageDueDateCharge = new ChangeOperation(
+                dueDateCharge(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1), BigDecimal.TEN));
+        ChangeOperation repayment = new ChangeOperation(transaction(LocalDate.of(2024, 1, 3), false));
+        ChangeOperation flatDueDateCharge = new ChangeOperation(dueDateCharge(LocalDate.of(2024, 1, 2), LocalDate.of(2024, 2, 1), null));
+        List<ChangeOperation> changeOperations = new ArrayList<>(List.of(percentageDueDateCharge, repayment, flatDueDateCharge));
+
+        // when
+        List<ChangeOperation> result = invokeFixPercentageDueDateChargesSortOrderBeforeFirstDisbursement(changeOperations);
+
+        // then
+        assertSame(changeOperations, result);
+        Assertions.assertIterableEquals(List.of(percentageDueDateCharge, repayment, flatDueDateCharge), result);
+    }
+
+    @Test
+    public void fixPercentageDueDateChargesSortOrderMovesPercentageDueDateChargeAfterFirstDisbursement() {
+        // given
+        ChangeOperation percentageDueDateCharge = new ChangeOperation(
+                dueDateCharge(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1), BigDecimal.TEN));
+        ChangeOperation disbursement = new ChangeOperation(transaction(LocalDate.of(2024, 1, 2), true));
+        ChangeOperation repayment = new ChangeOperation(transaction(LocalDate.of(2024, 1, 3), false));
+        List<ChangeOperation> changeOperations = new ArrayList<>(List.of(percentageDueDateCharge, disbursement, repayment));
+
+        // when
+        List<ChangeOperation> result = invokeFixPercentageDueDateChargesSortOrderBeforeFirstDisbursement(changeOperations);
+
+        // then
+        Assertions.assertIterableEquals(List.of(disbursement, percentageDueDateCharge, repayment), result);
+    }
+
+    @Test
+    public void fixPercentageDueDateChargesSortOrderMovesMultiplePercentageDueDateChargesAfterFirstDisbursementKeepingRelativeOrder() {
+        // given
+        ChangeOperation percentageDueDateChargeA = new ChangeOperation(
+                dueDateCharge(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1), BigDecimal.TEN));
+        ChangeOperation percentageDueDateChargeB = new ChangeOperation(
+                dueDateCharge(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 3, 1), BigDecimal.ONE));
+        ChangeOperation disbursement = new ChangeOperation(transaction(LocalDate.of(2024, 1, 2), true));
+        ChangeOperation repayment = new ChangeOperation(transaction(LocalDate.of(2024, 1, 3), false));
+        List<ChangeOperation> changeOperations = new ArrayList<>(
+                List.of(percentageDueDateChargeA, percentageDueDateChargeB, disbursement, repayment));
+
+        // when
+        List<ChangeOperation> result = invokeFixPercentageDueDateChargesSortOrderBeforeFirstDisbursement(changeOperations);
+
+        // then
+        Assertions.assertIterableEquals(List.of(disbursement, percentageDueDateChargeA, percentageDueDateChargeB, repayment), result);
+    }
+
+    @Test
+    public void fixPercentageDueDateChargesSortOrderKeepsFlatDueDateChargeBeforeDisbursement() {
+        // given
+        ChangeOperation flatDueDateCharge = new ChangeOperation(dueDateCharge(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1), null));
+        ChangeOperation percentageDueDateCharge = new ChangeOperation(
+                dueDateCharge(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1), BigDecimal.TEN));
+        ChangeOperation disbursement = new ChangeOperation(transaction(LocalDate.of(2024, 1, 2), true));
+        ChangeOperation repayment = new ChangeOperation(transaction(LocalDate.of(2024, 1, 3), false));
+        List<ChangeOperation> changeOperations = new ArrayList<>(
+                List.of(flatDueDateCharge, percentageDueDateCharge, disbursement, repayment));
+
+        // when
+        List<ChangeOperation> result = invokeFixPercentageDueDateChargesSortOrderBeforeFirstDisbursement(changeOperations);
+
+        // then
+        Assertions.assertIterableEquals(List.of(flatDueDateCharge, disbursement, percentageDueDateCharge, repayment), result);
+    }
+
+    @Test
+    public void fixPercentageDueDateChargesSortOrderDoesNotMovePercentageDueDateChargeAfterFirstDisbursement() {
+        // given
+        ChangeOperation disbursement = new ChangeOperation(transaction(LocalDate.of(2024, 1, 1), true));
+        ChangeOperation repayment = new ChangeOperation(transaction(LocalDate.of(2024, 1, 2), false));
+        ChangeOperation percentageDueDateCharge = new ChangeOperation(
+                dueDateCharge(LocalDate.of(2024, 1, 3), LocalDate.of(2024, 2, 1), BigDecimal.TEN));
+        List<ChangeOperation> changeOperations = new ArrayList<>(List.of(disbursement, repayment, percentageDueDateCharge));
+
+        // when
+        List<ChangeOperation> result = invokeFixPercentageDueDateChargesSortOrderBeforeFirstDisbursement(changeOperations);
+
+        // then
+        assertSame(changeOperations, result);
+        Assertions.assertIterableEquals(List.of(disbursement, repayment, percentageDueDateCharge), result);
+    }
+
+    @Test
+    public void createSortedChangeListAppliesPercentageDueDateChargeOrderingFixAfterSorting() {
+        // given
+        LoanCharge percentageDueDateCharge = dueDateCharge(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1), BigDecimal.TEN);
+        LoanTransaction disbursement = transaction(LocalDate.of(2024, 1, 2), true);
+        LoanTransaction repayment = transaction(LocalDate.of(2024, 1, 3), false);
+
+        // when
+        List<ChangeOperation> result = invokeCreateSortedChangeList(List.of(), List.of(repayment, disbursement),
+                new LinkedHashSet<>(Set.of(percentageDueDateCharge)));
+
+        // then
+        assertEquals(3, result.size());
+        assertSame(disbursement, result.get(0).getLoanTransaction().orElseThrow());
+        assertSame(percentageDueDateCharge, result.get(1).getLoanCharge().orElseThrow());
+        assertSame(repayment, result.get(2).getLoanTransaction().orElseThrow());
+    }
+
+    @Test
+    public void createSortedChangeListKeepsPercentageDueDateChargeWhenNoDisbursementExists() {
+        // given
+        LoanCharge percentageDueDateCharge = dueDateCharge(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1), BigDecimal.TEN);
+        LoanTransaction repayment = transaction(LocalDate.of(2024, 1, 3), false);
+
+        // when
+        List<ChangeOperation> result = invokeCreateSortedChangeList(List.of(), List.of(repayment),
+                new LinkedHashSet<>(Set.of(percentageDueDateCharge)));
+
+        // then
+        assertEquals(2, result.size());
+        assertSame(percentageDueDateCharge, result.get(0).getLoanCharge().orElseThrow());
+        assertSame(repayment, result.get(1).getLoanTransaction().orElseThrow());
+    }
+
+    @Test
+    public void createSortedChangeListHandlesNullCharges() {
+        // given
+        LoanTransaction disbursement = transaction(LocalDate.of(2024, 1, 1), true);
+        LoanTransaction repayment = transaction(LocalDate.of(2024, 1, 2), false);
+
+        // when
+        List<ChangeOperation> result = invokeCreateSortedChangeList(List.of(), List.of(repayment, disbursement), null);
+
+        // then
+        assertEquals(2, result.size());
+        assertSame(disbursement, result.get(0).getLoanTransaction().orElseThrow());
+        assertSame(repayment, result.get(1).getLoanTransaction().orElseThrow());
+    }
+
+    @Test
+    public void createSortedChangeListHandlesNullTransactions() {
+        // given
+        LoanCharge percentageDueDateCharge = dueDateCharge(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1), BigDecimal.TEN);
+        LoanCharge flatDueDateCharge = dueDateCharge(LocalDate.of(2024, 1, 2), LocalDate.of(2024, 2, 1), null);
+
+        // when
+        List<ChangeOperation> result = invokeCreateSortedChangeList(List.of(), null,
+                new LinkedHashSet<>(List.of(flatDueDateCharge, percentageDueDateCharge)));
+
+        // then
+        assertEquals(2, result.size());
+        assertSame(percentageDueDateCharge, result.get(0).getLoanCharge().orElseThrow());
+        assertSame(flatDueDateCharge, result.get(1).getLoanCharge().orElseThrow());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ChangeOperation> invokeFixPercentageDueDateChargesSortOrderBeforeFirstDisbursement(
+            final List<ChangeOperation> changeOperations) {
+        try {
+            Method method = AdvancedPaymentScheduleTransactionProcessor.class
+                    .getDeclaredMethod("fixPercentageDueDAteChargesSortOrderBeforeFirstDisbursement", List.class);
+            method.setAccessible(true);
+            return (List<ChangeOperation>) method.invoke(underTest, changeOperations);
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ChangeOperation> invokeCreateSortedChangeList(final List<?> loanTermVariations,
+            final List<LoanTransaction> loanTransactions, final Set<LoanCharge> charges) {
+        try {
+            Method method = AdvancedPaymentScheduleTransactionProcessor.class.getDeclaredMethod("createSortedChangeList", List.class,
+                    List.class, Set.class);
+            method.setAccessible(true);
+            return (List<ChangeOperation>) method.invoke(underTest, loanTermVariations, loanTransactions, charges);
+        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+            throw new AssertionError(e);
+        }
+    }
+
+    private LoanTransaction transaction(final LocalDate transactionDate, final boolean disbursement) {
+        LoanTransaction loanTransaction = mock(LoanTransaction.class);
+        lenient().when(loanTransaction.isDisbursement()).thenReturn(disbursement);
+        lenient().when(loanTransaction.getTransactionDate()).thenReturn(transactionDate);
+        lenient().when(loanTransaction.getSubmittedOnDate()).thenReturn(transactionDate);
+        lenient().when(loanTransaction.getCreatedDate())
+                .thenReturn(Optional.of(DateUtils.getOffsetDateTimeOfTenantFromLocalDate(transactionDate)));
+        lenient().when(loanTransaction.isAccrualActivity()).thenReturn(false);
+        return loanTransaction;
+    }
+
+    private LoanCharge dueDateCharge(final LocalDate submittedOnDate, final LocalDate dueDate, final BigDecimal percentage) {
+        LoanCharge loanCharge = mock(LoanCharge.class);
+        lenient().when(loanCharge.isDueDateCharge()).thenReturn(true);
+        lenient().when(loanCharge.isInstalmentFee()).thenReturn(false);
+        lenient().when(loanCharge.getSubmittedOnDate()).thenReturn(submittedOnDate);
+        lenient().when(loanCharge.getDueDate()).thenReturn(dueDate);
+        lenient().when(loanCharge.getDueLocalDate()).thenReturn(dueDate);
+        lenient().when(loanCharge.getPercentage()).thenReturn(percentage);
+        lenient().when(loanCharge.getCreatedDate())
+                .thenReturn(Optional.of(DateUtils.getOffsetDateTimeOfTenantFromLocalDate(submittedOnDate)));
+        return loanCharge;
+    }
+
     @NonNull
-    private LoanCreditAllocationRule createMockCreditAllocationRule(AllocationType... allocationTypes) {
-        LoanCreditAllocationRule mockCreditAllocationRule = mock(LoanCreditAllocationRule.class);
-        lenient().when(mockCreditAllocationRule.getTransactionType()).thenReturn(CreditAllocationTransactionType.CHARGEBACK);
-        lenient().when(mockCreditAllocationRule.getAllocationTypes()).thenReturn(Arrays.asList(allocationTypes));
-        return mockCreditAllocationRule;
+    private LoanCreditAllocationRule createRuleBasedCreditAllocationRule(AllocationType... allocationTypes) {
+        return new LoanCreditAllocationRule(null, CreditAllocationTransactionType.CHARGEBACK, Arrays.asList(allocationTypes),
+                CreditAllocationStrategy.RULE_BASED);
+    }
+
+    @NonNull
+    private LoanCreditAllocationRule createPrincipalOnlyCreditAllocationRule() {
+        return new LoanCreditAllocationRule(null, CreditAllocationTransactionType.CHARGEBACK, List.of(),
+                CreditAllocationStrategy.PRINCIPAL_ONLY);
+    }
+
+    private void verifyChargebackComponents(LoanTransaction chargebackTransaction, double expectedPrincipal, double expectedInterest,
+            double expectedFee, double expectedPenalty) {
+        ArgumentCaptor<Money> principal = ArgumentCaptor.forClass(Money.class);
+        ArgumentCaptor<Money> interest = ArgumentCaptor.forClass(Money.class);
+        ArgumentCaptor<Money> fee = ArgumentCaptor.forClass(Money.class);
+        ArgumentCaptor<Money> penalty = ArgumentCaptor.forClass(Money.class);
+        Mockito.verify(chargebackTransaction, times(1)).updateComponents(principal.capture(), interest.capture(), fee.capture(),
+                penalty.capture());
+        assertEquals(0, principal.getValue().getAmount().compareTo(BigDecimal.valueOf(expectedPrincipal)));
+        assertEquals(0, interest.getValue().getAmount().compareTo(BigDecimal.valueOf(expectedInterest)));
+        assertEquals(0, fee.getValue().getAmount().compareTo(BigDecimal.valueOf(expectedFee)));
+        assertEquals(0, penalty.getValue().getAmount().compareTo(BigDecimal.valueOf(expectedPenalty)));
     }
 
     private LoanTransaction createRepayment(Loan loan, LoanTransaction toTransaction, double principalPortion, double interestPortion,
@@ -787,4 +1292,254 @@ class AdvancedPaymentScheduleTransactionProcessorTest {
         Assertions.assertEquals(originalTransaction, repayment2);
     }
 
+    @Test
+    public void handleFeeRefundRecalculatesAReplayCopyFromTheRelationOfTheOriginal() {
+        final Loan loan = feeRefundLoan();
+        final LoanTransaction feeRefund = feeRefund(loan, 5L, "10", refund(loan, "600", JAN_15));
+        final LoanTransaction copy = LoanTransaction.copyTransactionProperties(feeRefund);
+        final ProgressiveTransactionCtx ctx = feeRefundCtx();
+        ctx.getChangedTransactionDetail().addTransactionChange(new TransactionChangeData(feeRefund, copy));
+
+        underTest.processLatestTransaction(copy, ctx);
+
+        Assertions.assertEquals(0, new BigDecimal("15").compareTo(copy.getAmount()));
+        Assertions.assertEquals(0, BigDecimal.TEN.compareTo(feeRefund.getAmount()));
+    }
+
+    @Test
+    public void handleFeeRefundRecalculatesANewFeeRefundInPlace() {
+        final Loan loan = feeRefundLoan();
+        final LoanTransaction feeRefund = feeRefund(loan, null, "10", refund(loan, "600", JAN_15));
+
+        underTest.processLatestTransaction(feeRefund, feeRefundCtx());
+
+        Assertions.assertEquals(0, new BigDecimal("15").compareTo(feeRefund.getAmount()));
+    }
+
+    @Test
+    public void handleFeeRefundIsCappedByTheEarlierRefunds() {
+        final Loan loan = feeRefundLoan();
+        // counts although its Fee refund is missing: it is created on the next replay
+        refund(loan, "600", LocalDate.of(2026, 1, 10));
+        refund(loan, "800", LocalDate.of(2026, 1, 12)).reverse();
+        refund(loan, "800", LocalDate.of(2026, 1, 20));
+        final LoanTransaction feeRefund = feeRefund(loan, null, "25", refund(loan, "1000", JAN_15));
+
+        underTest.processLatestTransaction(feeRefund, feeRefundCtx());
+
+        Assertions.assertEquals(0, BigDecimal.TEN.compareTo(feeRefund.getAmount()));
+    }
+
+    @Test
+    public void handleFeeRefundDoesNotCountLaterFeeRefundsAlreadyReplayed() {
+        // accelerated maturity replay: a Fee refund is replayed again after the later ones were processed
+        final Loan loan = feeRefundLoan();
+        final LoanTransaction laterFeeRefund = feeRefund(loan, 6L, "20", refund(loan, "800", LocalDate.of(2026, 1, 20)));
+        loan.getLoanTransactions().add(laterFeeRefund);
+        final LoanTransaction feeRefund = feeRefund(loan, 5L, "5", refund(loan, "200", JAN_15));
+        loan.getLoanTransactions().add(feeRefund);
+        final LoanTransaction copy = LoanTransaction.copyTransactionProperties(feeRefund);
+        final ProgressiveTransactionCtx ctx = feeRefundCtx();
+        ctx.getChangedTransactionDetail().addTransactionChange(new TransactionChangeData(feeRefund, copy));
+        ctx.getAlreadyProcessedTransactions().add(laterFeeRefund);
+        ctx.getAlreadyProcessedTransactions().add(feeRefund);
+
+        underTest.processLatestTransaction(copy, ctx);
+
+        Assertions.assertTrue(copy.isNotReversed());
+        Assertions.assertEquals(0, new BigDecimal("5").compareTo(copy.getAmount()));
+    }
+
+    @Test
+    public void handleFeeRefundReversesWithoutAllocationWhenNothingIsLeftToRefund() {
+        final Loan loan = feeRefundLoan();
+        refund(loan, "1000", LocalDate.of(2026, 1, 10));
+        final LoanTransaction feeRefund = feeRefund(loan, null, "10", refund(loan, "400", JAN_15));
+
+        underTest.processLatestTransaction(feeRefund, feeRefundCtx());
+
+        Assertions.assertTrue(feeRefund.isReversed());
+        Mockito.verify(loan, never()).getPaymentAllocationRules();
+    }
+
+    @Test
+    public void handleFeeRefundKeepsTheAmountWithoutARelatedRefund() {
+        final LoanTransaction simulated = LoanTransaction.feeRefund(feeRefundLoan(), BigDecimal.TEN, JAN_15, null);
+
+        underTest.processLatestTransaction(simulated, feeRefundCtx());
+
+        Assertions.assertEquals(0, BigDecimal.TEN.compareTo(simulated.getAmount()));
+    }
+
+    @Test
+    public void handleFeeRefundKeepsTheAmountOfTheLatestTransactionWithoutProgressiveContext() {
+        final Loan loan = feeRefundLoan();
+        final LoanTransaction feeRefund = feeRefund(loan, null, "10", refund(loan, "600", JAN_15));
+
+        underTest.processLatestTransaction(feeRefund, new TransactionCtx(MONETARY_CURRENCY, List.of(), Set.of(),
+                new MoneyHolder(Money.zero(MONETARY_CURRENCY)), null, List.of()));
+
+        Assertions.assertEquals(0, BigDecimal.TEN.compareTo(feeRefund.getAmount()));
+    }
+
+    private static ProgressiveTransactionCtx feeRefundCtx() {
+        return new ProgressiveTransactionCtx(MONETARY_CURRENCY, List.of(), Set.of(), new MoneyHolder(Money.zero(MONETARY_CURRENCY)),
+                new ChangedTransactionDetail(), null, List.of());
+    }
+
+    // 1000 disbursed with a fee of 25, Fee refund on Merchant issued refund; refunds are added to its transactions
+    private static Loan feeRefundLoan() {
+        final Loan loan = mock(Loan.class);
+        final LoanTransaction disbursement = mock(LoanTransaction.class);
+        lenient().when(disbursement.isNotReversed()).thenReturn(true);
+        lenient().when(disbursement.isDisbursement()).thenReturn(true);
+        lenient().when(disbursement.getTypeOf()).thenReturn(LoanTransactionType.DISBURSEMENT);
+        lenient().when(disbursement.getTransactionDate()).thenReturn(LocalDate.of(2026, 1, 1));
+        lenient().when(disbursement.getAmount()).thenReturn(BigDecimal.valueOf(1000));
+        final LoanCharge fee = mock(LoanCharge.class);
+        lenient().when(fee.isActive()).thenReturn(true);
+        lenient().when(fee.isDueAtDownPayment()).thenReturn(true);
+        lenient().when(fee.getDueLocalDate()).thenReturn(LocalDate.of(2026, 1, 1));
+        lenient().when(fee.amount()).thenReturn(BigDecimal.valueOf(25));
+        lenient().when(loan.getLoanTransactions()).thenReturn(new ArrayList<>(List.of(disbursement)));
+        lenient().when(loan.getLoanCharges()).thenReturn(Set.of(fee));
+        lenient().when(loan.getCurrency()).thenReturn(MONETARY_CURRENCY);
+        lenient().when(loan.getSupportedFeeRefundTransactionTypes()).thenReturn(List.of(LoanTransactionType.MERCHANT_ISSUED_REFUND));
+        final LoanPaymentAllocationRule allocationRule = mock(LoanPaymentAllocationRule.class);
+        lenient().when(allocationRule.getTransactionType()).thenReturn(PaymentAllocationTransactionType.DEFAULT);
+        lenient().when(loan.getPaymentAllocationRules()).thenReturn(List.of(allocationRule));
+        final LoanProductRelatedDetail productDetail = mock(LoanProductRelatedDetail.class);
+        lenient().when(productDetail.getLoanScheduleProcessingType()).thenReturn(LoanScheduleProcessingType.HORIZONTAL);
+        lenient().when(loan.getLoanProductRelatedDetail()).thenReturn(productDetail);
+        return loan;
+    }
+
+    // Merchant issued refund of the loan
+    private static LoanTransaction refund(final Loan loan, final String amount, final LocalDate date) {
+        final LoanTransaction refund = LoanTransaction.refund(loan, LoanTransactionType.MERCHANT_ISSUED_REFUND, new BigDecimal(amount),
+                null, date, null);
+        loan.getLoanTransactions().add(refund);
+        return refund;
+    }
+
+    // Fee refund on the date of its refund
+    private static LoanTransaction feeRefund(final Loan loan, final Long id, final String amount, final LoanTransaction refund) {
+        final LoanTransaction feeRefund = LoanTransaction.feeRefund(loan, new BigDecimal(amount), refund.getTransactionDate(), null);
+        ReflectionTestUtils.setField(feeRefund, "id", id);
+        feeRefund.getLoanTransactionRelations()
+                .add(LoanTransactionRelation.linkToTransaction(feeRefund, refund, LoanTransactionRelationTypeEnum.RELATED));
+        return feeRefund;
+    }
+
+    @Test
+    public void useOldTransactionIfApplicableKeepsOriginalWaiveChargesWhenSameDayTransactionWasReplaced() {
+        // given
+        final LoanTransaction replacedRepayment = mock(LoanTransaction.class);
+        when(replacedRepayment.getId()).thenReturn(1L);
+        final LoanTransaction replayedRepayment = mock(LoanTransaction.class);
+
+        final LoanTransaction originalWaive = mock(LoanTransaction.class);
+        when(originalWaive.getId()).thenReturn(2L);
+        when(originalWaive.getTypeOf()).thenReturn(LoanTransactionType.WAIVE_CHARGES);
+        final LoanTransaction replayedWaive = mock(LoanTransaction.class);
+
+        final ChangedTransactionDetail changedTransactionDetail = new ChangedTransactionDetail();
+        changedTransactionDetail.addTransactionChange(new TransactionChangeData(replacedRepayment, replayedRepayment));
+        changedTransactionDetail.addTransactionChange(new TransactionChangeData(originalWaive, replayedWaive));
+        final TransactionCtx ctx = mock(TransactionCtx.class);
+        when(ctx.getCurrency()).thenReturn(MONETARY_CURRENCY);
+        when(ctx.getChangedTransactionDetail()).thenReturn(changedTransactionDetail);
+
+        // when
+        final LoanTransaction result = AdvancedPaymentScheduleTransactionProcessor.useOldTransactionIfApplicable(originalWaive,
+                replayedWaive, ctx);
+
+        // then
+        Assertions.assertSame(originalWaive, result);
+        Assertions.assertEquals(1, changedTransactionDetail.getTransactionChanges().size());
+        Assertions.assertSame(replayedRepayment, changedTransactionDetail.getTransactionChanges().get(0).getNewTransaction());
+        Mockito.verify(originalWaive, never()).updateLoanChargePaidMappings(any());
+    }
+
+    @Test
+    public void useOldTransactionIfApplicableReplacesRepaymentWhenSameDayTransactionWasReplaced() {
+        // given
+        final LoanTransaction replacedRepayment = mock(LoanTransaction.class);
+        when(replacedRepayment.getId()).thenReturn(1L);
+        final LoanTransaction replayedRepayment = mock(LoanTransaction.class);
+        when(replayedRepayment.getTransactionDate()).thenReturn(transactionDate);
+
+        final LoanTransaction originalRepayment = mock(LoanTransaction.class);
+        when(originalRepayment.getId()).thenReturn(2L);
+        when(originalRepayment.getTypeOf()).thenReturn(LoanTransactionType.REPAYMENT);
+        when(originalRepayment.getTransactionDate()).thenReturn(transactionDate);
+        final Money amount = Money.of(MONETARY_CURRENCY, BigDecimal.TEN);
+        when(originalRepayment.getAmount(MONETARY_CURRENCY)).thenReturn(amount);
+        final LoanTransaction replayedOriginalRepayment = mock(LoanTransaction.class);
+        when(replayedOriginalRepayment.getAmount(MONETARY_CURRENCY)).thenReturn(amount);
+        final Money zero = Money.zero(MONETARY_CURRENCY);
+        for (LoanTransaction transaction : List.of(originalRepayment, replayedOriginalRepayment)) {
+            when(transaction.getPrincipalPortion(MONETARY_CURRENCY)).thenReturn(zero);
+            when(transaction.getInterestPortion(MONETARY_CURRENCY)).thenReturn(zero);
+            when(transaction.getFeeChargesPortion(MONETARY_CURRENCY)).thenReturn(zero);
+            when(transaction.getPenaltyChargesPortion(MONETARY_CURRENCY)).thenReturn(zero);
+            when(transaction.getOverPaymentPortion(MONETARY_CURRENCY)).thenReturn(zero);
+        }
+
+        final ChangedTransactionDetail changedTransactionDetail = new ChangedTransactionDetail();
+        changedTransactionDetail.addTransactionChange(new TransactionChangeData(replacedRepayment, replayedRepayment));
+        changedTransactionDetail.addTransactionChange(new TransactionChangeData(originalRepayment, replayedOriginalRepayment));
+        final TransactionCtx ctx = mock(TransactionCtx.class);
+        when(ctx.getCurrency()).thenReturn(MONETARY_CURRENCY);
+        when(ctx.getChangedTransactionDetail()).thenReturn(changedTransactionDetail);
+
+        // when
+        final LoanTransaction result = AdvancedPaymentScheduleTransactionProcessor.useOldTransactionIfApplicable(originalRepayment,
+                replayedOriginalRepayment, ctx);
+
+        // then
+        Assertions.assertNull(result);
+        Assertions.assertEquals(2, changedTransactionDetail.getTransactionChanges().size());
+    }
+
+    @Test
+    public void handleZeroInterestChargeOffSkipsAdditionalInstallmentStraddlingChargeOffDate() {
+        // given
+        final LocalDate chargeOffDate = LocalDate.of(2024, 2, 10);
+        final LocalDate additionalFromDate = LocalDate.of(2024, 2, 1);
+        final LocalDate additionalDueDate = LocalDate.of(2024, 2, 15);
+
+        final Loan loan = mock(Loan.class);
+        final LoanProductRelatedDetail loanProductRelatedDetail = mock(LoanProductRelatedDetail.class);
+        when(loan.getLoanProductRelatedDetail()).thenReturn(loanProductRelatedDetail);
+        when(loanProductRelatedDetail.getChargeOffBehaviour()).thenReturn(LoanChargeOffBehaviour.ZERO_INTEREST);
+        when(loan.isInterestBearingAndInterestRecalculationEnabled()).thenReturn(true);
+        when(loan.isNpa()).thenReturn(true);
+        when(loan.getCurrency()).thenReturn(MONETARY_CURRENCY);
+        // Money.of() reads the statically mocked MoneyHelper, so it must not be evaluated inside a when() call
+        final Money loanPrincipal = Money.of(MONETARY_CURRENCY, BigDecimal.valueOf(1000.00));
+        when(loan.getPrincipal()).thenReturn(loanPrincipal);
+
+        final LoanRepaymentScheduleInstallment additionalInstallment = new LoanRepaymentScheduleInstallment(loan, 3, additionalFromDate,
+                additionalDueDate, BigDecimal.valueOf(50.00), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, true, false, false);
+        final List<LoanRepaymentScheduleInstallment> installments = List.of(additionalInstallment);
+
+        final LoanTransaction chargeOffTransaction = mock(LoanTransaction.class);
+        when(chargeOffTransaction.getTypeOf()).thenReturn(LoanTransactionType.CHARGE_OFF);
+        when(chargeOffTransaction.getLoan()).thenReturn(loan);
+        when(chargeOffTransaction.getTransactionDate()).thenReturn(chargeOffDate);
+        lenient().when(chargeOffTransaction.isRepaymentLikeType()).thenReturn(false);
+        lenient().when(chargeOffTransaction.isNotReversed()).thenReturn(true);
+
+        final ProgressiveLoanInterestScheduleModel model = mock(ProgressiveLoanInterestScheduleModel.class);
+
+        final MoneyHolder overpaymentHolder = new MoneyHolder(Money.zero(MONETARY_CURRENCY));
+        final ChangedTransactionDetail changedTransactionDetail = mock(ChangedTransactionDetail.class);
+        final ProgressiveTransactionCtx ctx = new ProgressiveTransactionCtx(MONETARY_CURRENCY, installments, Set.of(), overpaymentHolder,
+                changedTransactionDetail, model, loan.getActiveLoanTermVariations());
+
+        // then
+        Assertions.assertDoesNotThrow(() -> underTest.processLatestTransaction(chargeOffTransaction, ctx));
+    }
 }

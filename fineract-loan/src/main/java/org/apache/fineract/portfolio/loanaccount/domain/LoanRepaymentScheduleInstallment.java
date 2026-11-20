@@ -27,7 +27,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -35,7 +37,6 @@ import java.util.Objects;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.core.domain.AbstractAuditableWithUTCDateTimeCustom;
 import org.apache.fineract.infrastructure.core.service.DateUtils;
 import org.apache.fineract.infrastructure.core.service.MathUtil;
@@ -340,6 +341,29 @@ public class LoanRepaymentScheduleInstallment extends AbstractAuditableWithUTCDa
         final Money interestAccountedFor = getInterestPaid(currency).plus(getInterestWaived(currency))
                 .plus(getInterestWrittenOff(currency));
         return getInterestCharged(currency).minus(interestAccountedFor);
+    }
+
+    /**
+     * The interest charged prorated by the days of the installment elapsed until {@code date}, which is what an early
+     * termination on that date charges for the installment when interest is not recalculated. Interest already paid,
+     * waived or written off is never charged back below.
+     */
+    public Money getInterestChargedProratedTill(final LocalDate date, final MonetaryCurrency currency) {
+        final Money interestCharged = getInterestCharged(currency);
+        if (!interestCharged.isGreaterThanZero()) {
+            return interestCharged;
+        }
+        final long daysInInstallment = ChronoUnit.DAYS.between(getFromDate(), getDueDate());
+        final long daysTillDate = ChronoUnit.DAYS.between(getFromDate(), date);
+        final MathContext mc = MoneyHelper.getMathContext();
+        final Money prorated = Money.of(currency, interestCharged.getAmount().divide(BigDecimal.valueOf(daysInInstallment), mc)
+                .multiply(BigDecimal.valueOf(daysTillDate), mc), mc);
+        final Money interestSettled = interestCharged.minus(getInterestOutstanding(currency));
+        return prorated.isGreaterThan(interestSettled) ? prorated : interestSettled;
+    }
+
+    public Money getInterestOutstandingProratedTill(final LocalDate date, final MonetaryCurrency currency) {
+        return getInterestChargedProratedTill(date, currency).minus(getInterestCharged(currency).minus(getInterestOutstanding(currency)));
     }
 
     public Money getInterestAccrued(final MonetaryCurrency currency) {
@@ -1255,7 +1279,7 @@ public class LoanRepaymentScheduleInstallment extends AbstractAuditableWithUTCDa
                 getPostDatedChecks().stream().filter(pdc -> MathUtil.isEqualTo(pdc.getCheckNo(), npdc.getCheckNo()) //
                         && MathUtil.isEqualTo(pdc.getAccountNo(), npdc.getAccountNo()) //
                         && MathUtil.isEqualTo(pdc.getAmount(), npdc.getAmount()) //
-                        && StringUtils.equals(pdc.getBankName(), npdc.getBankName()) //
+                        && Objects.equals(pdc.getBankName(), npdc.getBankName()) //
                         && MathUtil.isEqualTo(pdc.getStatus(), npdc.getStatus()) //
                         && DateUtils.isEqual(pdc.getRepaymentDate(), npdc.getRepaymentDate())) //
                         .findAny().ifPresentOrElse(retainedPostDatedChecks::add, () -> retainedPostDatedChecks.add(npdc));

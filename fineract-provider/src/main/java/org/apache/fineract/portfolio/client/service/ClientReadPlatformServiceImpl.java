@@ -31,6 +31,7 @@ import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.fineract.infrastructure.codes.data.CodeValueData;
+import org.apache.fineract.infrastructure.codes.domain.CodeValue;
 import org.apache.fineract.infrastructure.codes.service.CodeValueReadPlatformService;
 import org.apache.fineract.infrastructure.core.data.ApiParameterError;
 import org.apache.fineract.infrastructure.core.data.EnumOptionData;
@@ -42,6 +43,8 @@ import org.apache.fineract.infrastructure.core.service.Page;
 import org.apache.fineract.infrastructure.core.service.PaginationHelper;
 import org.apache.fineract.infrastructure.core.service.SearchParameters;
 import org.apache.fineract.infrastructure.core.service.database.DatabaseSpecificSQLGenerator;
+import org.apache.fineract.infrastructure.security.exception.InputValidationException;
+import org.apache.fineract.infrastructure.security.service.InputValidator;
 import org.apache.fineract.infrastructure.security.service.PlatformSecurityContext;
 import org.apache.fineract.infrastructure.security.utils.ColumnValidator;
 import org.apache.fineract.portfolio.client.data.ClientCollateralManagementData;
@@ -50,6 +53,8 @@ import org.apache.fineract.portfolio.client.data.ClientNonPersonData;
 import org.apache.fineract.portfolio.client.data.ClientTimelineData;
 import org.apache.fineract.portfolio.client.domain.Client;
 import org.apache.fineract.portfolio.client.domain.ClientEnumerations;
+import org.apache.fineract.portfolio.client.domain.ClientNonPerson;
+import org.apache.fineract.portfolio.client.domain.ClientNonPersonRepositoryWrapper;
 import org.apache.fineract.portfolio.client.domain.ClientRepositoryWrapper;
 import org.apache.fineract.portfolio.client.domain.ClientStatus;
 import org.apache.fineract.portfolio.client.exception.ClientNotFoundException;
@@ -62,9 +67,11 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ClientReadPlatformServiceImpl implements ClientReadPlatformService {
 
     private final JdbcTemplate jdbcTemplate;
@@ -81,7 +88,9 @@ public class ClientReadPlatformServiceImpl implements ClientReadPlatformService 
     private final ColumnValidator columnValidator;
     private final ClientCollateralManagementRepositoryWrapper clientCollateralManagementRepositoryWrapper;
     private final ClientRepositoryWrapper clientRepositoryWrapper;
+    private final ClientNonPersonRepositoryWrapper clientNonPersonRepositoryWrapper;
     private final ClientMapper clientMapper;
+    private final InputValidator inputValidator;
 
     @Override
     public Page<ClientData> retrieveAll(final SearchParameters searchParameters) {
@@ -118,11 +127,15 @@ public class ClientReadPlatformServiceImpl implements ClientReadPlatformService 
             }
 
             if (searchParameters.hasOrderBy()) {
-                sqlBuilder.append(" order by ").append(searchParameters.getOrderBy());
-                this.columnValidator.validateSqlInjection(sqlBuilder.toString(), searchParameters.getOrderBy());
+                String orderBy = searchParameters.getOrderBy();
+                this.inputValidator.validate("client-order-by", orderBy);
+                sqlBuilder.append(" order by ").append(orderBy);
                 if (searchParameters.hasSortOrder()) {
-                    sqlBuilder.append(' ').append(searchParameters.getSortOrder());
-                    this.columnValidator.validateSqlInjection(sqlBuilder.toString(), searchParameters.getSortOrder());
+                    String sortOrder = searchParameters.getSortOrder();
+                    if (!"ASC".equalsIgnoreCase(sortOrder) && !"DESC".equalsIgnoreCase(sortOrder)) {
+                        throw new InputValidationException(String.format("invalid sortOrder value '%s'", sortOrder));
+                    }
+                    sqlBuilder.append(' ').append(sortOrder);
                 }
             }
 
@@ -214,6 +227,11 @@ public class ClientReadPlatformServiceImpl implements ClientReadPlatformService 
             final Client client = clientRepositoryWrapper.getClientByClientIdAndHierarchy(clientId, hierarchySearchString);
             final ClientData clientData = clientMapper.map(client);
 
+            final ClientNonPerson clientNonPerson = clientNonPersonRepositoryWrapper.findOneByClientId(clientId);
+            if (clientNonPerson != null) {
+                clientData.setClientNonPersonDetails(toClientNonPersonData(clientNonPerson));
+            }
+
             // Get client collaterals
             final Collection<ClientCollateralManagement> clientCollateralManagements = this.clientCollateralManagementRepositoryWrapper
                     .getCollateralsPerClient(clientId);
@@ -239,6 +257,19 @@ public class ClientReadPlatformServiceImpl implements ClientReadPlatformService 
         } catch (final EmptyResultDataAccessException e) {
             throw new ClientNotFoundException(clientId, e);
         }
+    }
+
+    private static ClientNonPersonData toClientNonPersonData(final ClientNonPerson clientNonPerson) {
+        return new ClientNonPersonData(toCodeValueData(clientNonPerson.getConstitution()), clientNonPerson.getIncorpNumber(),
+                clientNonPerson.getIncorpValidityTill(), toCodeValueData(clientNonPerson.getMainBusinessLine()),
+                clientNonPerson.getRemarks());
+    }
+
+    private static CodeValueData toCodeValueData(final CodeValue codeValue) {
+        if (codeValue == null) {
+            return null;
+        }
+        return CodeValueData.instance(codeValue.getId(), codeValue.getLabel());
     }
 
     @Override
@@ -360,7 +391,7 @@ public class ClientReadPlatformServiceImpl implements ClientReadPlatformService 
             this.schema = sqlBuilder.toString();
         }
 
-        public String schema() {
+        private String schema() {
             return this.schema;
         }
 
@@ -478,7 +509,7 @@ public class ClientReadPlatformServiceImpl implements ClientReadPlatformService 
 
     private static final class ParentGroupsMapper implements RowMapper<GroupGeneralData> {
 
-        public String parentGroupsSchema() {
+        private String parentGroupsSchema() {
             return "gp.id As groupId , gp.account_no as accountNo, gp.display_name As groupName from m_client cl JOIN m_group_client gc ON cl.id = gc.client_id "
                     + "JOIN m_group gp ON gp.id = gc.group_id WHERE cl.id  = ?";
         }
@@ -509,7 +540,7 @@ public class ClientReadPlatformServiceImpl implements ClientReadPlatformService 
             this.schema = builder.toString();
         }
 
-        public String schema() {
+        private String schema() {
             return this.schema;
         }
 
@@ -540,7 +571,7 @@ public class ClientReadPlatformServiceImpl implements ClientReadPlatformService 
 
     private static final class ClientIdentifierMapper implements RowMapper<ClientData> {
 
-        public String clientLookupByIdentifierSchema() {
+        private String clientLookupByIdentifierSchema() {
             return "c.id as id, c.account_no as accountNo, c.firstname as firstname, c.middlename as middlename, c.lastname as lastname, "
                     + "c.fullname as fullname, c.display_name as displayName," + "c.office_id as officeId, o.name as officeName "
                     + " from m_client c, m_office o, m_client_identifier ci " + "where o.id = c.office_id and c.id=ci.client_id "
@@ -642,7 +673,7 @@ public class ClientReadPlatformServiceImpl implements ClientReadPlatformService 
             this.schema = builder.toString();
         }
 
-        public String schema() {
+        private String schema() {
             return this.schema;
         }
 

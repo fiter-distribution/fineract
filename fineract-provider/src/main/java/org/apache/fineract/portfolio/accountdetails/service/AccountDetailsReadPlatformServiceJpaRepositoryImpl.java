@@ -303,7 +303,7 @@ public class AccountDetailsReadPlatformServiceJpaRepositoryImpl implements Accou
                     approvedShares, pendingShares, timeline);
         }
 
-        public String schema() {
+        private String schema() {
             return this.schema;
         }
     }
@@ -370,7 +370,7 @@ public class AccountDetailsReadPlatformServiceJpaRepositoryImpl implements Accou
             this.schemaSql = accountsSummary.toString();
         }
 
-        public String schema() {
+        private String schema() {
             return this.schemaSql;
         }
 
@@ -460,7 +460,7 @@ public class AccountDetailsReadPlatformServiceJpaRepositoryImpl implements Accou
 
     private static final class LoanAccountSummaryDataMapper implements RowMapper<LoanAccountSummaryData> {
 
-        public String loanAccountSummarySchema() {
+        private String loanAccountSummarySchema() {
 
             final StringBuilder accountsSummary = new StringBuilder("l.id as id, l.account_no as accountNo, l.external_id as externalId,");
             accountsSummary.append(" l.product_id as productId, lp.name as productName, lp.short_name as shortProductName,")
@@ -493,7 +493,7 @@ public class AccountDetailsReadPlatformServiceJpaRepositoryImpl implements Accou
                     .append(" l.expected_disbursedon_date as expectedDisbursementDate, l.disbursedon_date as actualDisbursementDate,")
                     .append(" dbu.username as disbursedByUsername, dbu.firstname as disbursedByFirstname, dbu.lastname as disbursedByLastname,")
 
-                    .append(" l.closedon_date as closedOnDate,")
+                    .append(" l.closedon_date as closedOnDate, l.overpaidon_date as overpaidOnDate,")
                     .append(" cbu.username as closedByUsername, cbu.firstname as closedByFirstname, cbu.lastname as closedByLastname,")
                     .append(" la.overdue_since_date_derived as overdueSinceDate, ")
                     .append(" l.writtenoffon_date as writtenOffOnDate, l.maturedon_date as actualMaturityDate, l.expected_maturedon_date as expectedMaturityDate, ")
@@ -586,6 +586,8 @@ public class AccountDetailsReadPlatformServiceJpaRepositoryImpl implements Accou
             final String chargedOffByFirstname = rs.getString("chargedOffByFirstname");
             final String chargedOffByLastname = rs.getString("chargedOffByLastname");
 
+            final LocalDate overpaidOnDate = JdbcSupport.getLocalDate(rs, "overpaidOnDate");
+
             Boolean inArrears = (overdueSinceDate != null);
 
             final LoanApplicationTimelineData timeline = new LoanApplicationTimelineData(submittedOnDate, submittedByUsername,
@@ -594,7 +596,7 @@ public class AccountDetailsReadPlatformServiceJpaRepositoryImpl implements Accou
                     approvedByFirstname, approvedByLastname, expectedDisbursementDate, actualDisbursementDate, disbursedByUsername,
                     disbursedByFirstname, disbursedByLastname, closedOnDate, closedByUsername, closedByFirstname, closedByLastname,
                     actualMaturityDate, expectedMaturityDate, writtenOffOnDate, closedByUsername, closedByFirstname, closedByLastname,
-                    chargedOffOnDate, chargedOffByUsername, chargedOffByFirstname, chargedOffByLastname, null);
+                    chargedOffOnDate, chargedOffByUsername, chargedOffByFirstname, chargedOffByLastname, overpaidOnDate);
 
             return new LoanAccountSummaryData(id, accountNo, parentAccountNumber, externalId, productId, loanProductName,
                     shortLoanProductName, loanStatus, currency, loanType, loanCycle, timeline, inArrears, originalLoan, loanBalance,
@@ -605,7 +607,7 @@ public class AccountDetailsReadPlatformServiceJpaRepositoryImpl implements Accou
 
     private static final class GuarantorLoanAccountSummaryDataMapper implements RowMapper<GuarantorAccountSummaryData> {
 
-        public String guarantorLoanAccountSummarySchema() {
+        private String guarantorLoanAccountSummarySchema() {
 
             final StringBuilder accountsSummary = new StringBuilder("l.id as id, l.account_no as accountNo, l.external_id as externalId,");
             accountsSummary.append(" l.product_id as productId, lp.name as productName, lp.short_name as shortProductName,")

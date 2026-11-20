@@ -12,13 +12,13 @@ flexible, extensible foundation for a wide range of financial services. By
 making robust banking technology openly available, it lowers barriers for
 institutions and innovators to reach underserved and unbanked populations.
 
-Have a look at the [documentation](https://fineract.apache.org/docs/current), the [wiki](https://cwiki.apache.org/confluence/display/FINERACT) or at the [FAQ](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=91554327), if this README does not answer what you are looking for.
+Have a look at the [documentation](https://fineract.apache.org/docs/stable), the [wiki](https://cwiki.apache.org/confluence/display/FINERACT) or at the [FAQ](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=91554327), if this README does not answer what you are looking for.
 
 
 COMMUNITY
 =========
 
-If you are interested in contributing to this project, but perhaps don't quite know how and where to get started, please [join our developer mailing list](http://fineract.apache.org/#contribute), listen into our conversations, chime into threads, or just send us a "Hello!" introduction email; we're a friendly bunch, and look forward to hearing from you. A more informal alternative is the [Fineract Slack channel](https://app.slack.com/client/T0F5GHE8Y/C028634A61L) (thank you, Mifos, for supporting the Slack channel!).
+If you are interested in contributing to this project, but perhaps don't quite know how and where to get started, please [join our developer mailing list](http://fineract.apache.org/#contribute) and [chat server](https://app.element.io/#/room/#apache-fineract-home:matrix.org), listen into our conversations, chime into threads, or just send us a "Hello!" introduction message; we're a friendly bunch, and look forward to hearing from you.
 
 For the developer wiki, see [Contributor's Zone](https://cwiki.apache.org/confluence/display/FINERACT/Contributor%27s+Zone). Maybe [these how-to articles](https://cwiki.apache.org/confluence/display/FINERACT/How-to+articles) help you to get started.
 
@@ -29,11 +29,8 @@ In the moment you get started writing code, please consult our [CONTRIBUTING](CO
 
 REQUIREMENTS
 ============
-* 16GB RAM and 8 core CPU (minimum hardware for running Fineract -- development and testing may require more)
-* PostgreSQL >= 18.0 ([support for other backend databases is deprecated](https://cwiki.apache.org/confluence/display/FINERACT/FSIP-9%3A+Standardize+on+PostgreSQL))
-* Java >= 21 (Azul Zulu JVM is tested by our CI on GitHub Actions)
 
-Tomcat (min. v10) is only needed if you wish to deploy the Fineract WAR to a separate external servlet container. You do not need to install Tomcat to run Fineract. We recommend the use of the self-contained JAR, which transparently embeds a servlet container using Spring Boot.
+See [Fineract Development Environment](https://fineract.apache.org/docs/develop/#_fineract_development_environment) in the docs for hardware, software, and tool prerequisites and recommendations.
 
 
 SECURITY
@@ -42,7 +39,7 @@ For a list of known vulnerabilities, see [Apache Fineract Security Reports](http
 
 If you believe you have found a new vulnerability, [let us know privately](https://fineract.apache.org/#contribute).
 
-For details about security during development and deployment, see the documentation [here](https://fineract.apache.org/docs/current/#_security).
+For details about security during development and deployment, see the documentation [here](https://fineract.apache.org/docs/develop/#_security).
 
 PRIVATE FORKS
 ============
@@ -60,7 +57,7 @@ Follow these steps to quickly set up and run Apache Fineract locally.
 
 ### Prerequisites
 
-- Java 21 or higher (Azul Zulu is recommended)
+- [Java JDK](https://fineract.apache.org/docs/develop/#_fineract_development_environment)
 - PostgreSQL running locally, listening on port 5432 with proper permissions (see [below](#database-and-tables) for how to run PostgreSQL in Docker)
 
 ```bash
@@ -72,19 +69,18 @@ cd fineract
 ./gradlew createPGDB -PdbName=fineract_tenants
 ./gradlew createPGDB -PdbName=fineract_default
 
-# local dev/test env settings
-export FINERACT_DEFAULT_TENANTDB_PORT=5432
-export FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME=org.postgresql.Driver
-export FINERACT_HIKARI_JDBC_URL=jdbc:postgresql://localhost:$FINERACT_DEFAULT_TENANTDB_PORT/fineract_tenants
-export POSTGRES_PASSWORD=postgres
-export FINERACT_HIKARI_PASSWORD=$POSTGRES_PASSWORD
-export FINERACT_DEFAULT_TENANTDB_PWD=$POSTGRES_PASSWORD
-
 # start backend
 ./gradlew devRun
 ```
 
-After a minute or two, Fineract will be listening for API requests on port 8443 (by default).
+After a minute or two, Fineract will be listening for API requests on port 8443.
+Wait for the `APACHE FINERACT IS READY` message in the log before sending requests.
+
+Stopping a `bootRun` or `devRun` process is reported by Gradle as `Build cancelled while executing task`, but that does not mean that Fineract failed.
+A graceful shutdown is also logged, as `APACHE FINERACT IS SHUTTING DOWN GRACEFULLY`.
+
+> [!TIP]
+> Java properties or environment variables can be used to override default settings. See `fineract-provider/src/main/resources/application.properties`.
 
 ### Verify the application is running
 
@@ -117,34 +113,44 @@ Expected response for fresh instance:
 {"totalFilteredRecords":0,"pageItems":[]}
 ```
 
+How to run the tests
+---
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#how-to-run-tests) and [Integration Testing](https://fineract.apache.org/docs/develop/#_integration_testing).
+
 How to run for production
 ---
-Running Fineract _just to try it out_ is relatively easy. If you intend to use it _in a production environment_, be aware that a proper deployment can be complex, costly, and time-consuming. Considerations include: Security, privacy, compliance, performance, service availability, backups, and more. **The Fineract project does not provide a comprehensive guide for deploying Fineract in production.** You might need skills in enterprise Java applications and more. Alternatively, you could pay a vendor for Fineract deployment and maintenance. You will find tips and tricks for [deploying](https://fineract.apache.org/docs/current/#_deployment) and [securing](https://fineract.apache.org/docs/current/#_securing_fineract) Fineract in our official documentation.
+
+Running Fineract _just to try it out_ is relatively easy. If you intend to use it _in a production environment_, be aware that a proper deployment can be complex, costly, and time-consuming. Considerations include: Security, privacy, compliance, performance, service availability, backups, and more. **The Fineract project does not provide a comprehensive guide for deploying Fineract in production.** You might need skills in enterprise Java applications and more. Alternatively, you could pay a vendor for Fineract deployment and maintenance. You will find tips and tricks for [deploying](https://fineract.apache.org/docs/stable/#_deployment) and [securing](https://fineract.apache.org/docs/stable/#_securing_fineract) Fineract in our official documentation.
 
 
 How to build the JAR file
 ---
+
 Build a modern, cloud native, fully self contained JAR file:
+
 ```bash
 ./gradlew clean bootJar
 ```
+
 The JAR will be created in the `fineract-provider/build/libs` directory.
-If you use a MariaDB or MySQL (note: both are deprecated), you must download the appropriate JDBC driver since drivers for those databases use incompatible licenses. For example:
+If you intend to use MariaDB or MySQL (warning: [both are deprecated](https://cwiki.apache.org/confluence/display/FINERACT/FSIP-9%3A+Standardize+on+PostgreSQL)), you must download the appropriate JDBC driver yourself and override default database settings. When you start the JAR, specify the directory containing the JDBC driver.
+
+MariaDB example:
+
 ```bash
-wget https://dlm.mariadb.com/4174416/Connectors/java/connector-java-3.5.2/mariadb-java-client-3.5.2.jar
-```
-Start the JAR and specify the directory containing the JDBC driver using the loader.path option, for example:
-```bash
+# Assumes mariadb-java-client.jar exists in current dir.
+# For MariaDB or MySQL, override default settings such as these:
+export FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME=org.mariadb.jdbc.Driver
+export FINERACT_DEFAULT_TENANTDB_PORT=3306
+export FINERACT_HIKARI_JDBC_URL=jdbc:mariadb://localhost:3306/fineract_tenants
 java -Dloader.path=. -jar fineract-provider/build/libs/fineract-provider.jar
 ```
+
 This does not require an external Tomcat.
 
-The tenants database connection details are configured [via environment variables (as with Docker container)](#instructions-to-run-using-docker-or-podman), e.g. like this:
-```bash
-export FINERACT_HIKARI_PASSWORD=verysecret
-...
-java -jar fineract-provider.jar
-```
+> [!NOTE]
+> Versions of mariadb driver and Fineract JARs are omitted from filenames above for brevity.
 
 How to build the WAR file
 ---
@@ -155,6 +161,19 @@ Build a traditional WAR file:
 The WAR will be created in the `fineract-war/build/libs` directory. Afterwards deploy the WAR to your Tomcat Servlet Container.
 
 We recommend using the JAR instead of the WAR file deployment, because it's much easier.
+
+CI covers the JAR-based image everywhere and the WAR through one smoke job
+([`build-war-smoke.yml`](.github/workflows/build-war-smoke.yml)), which deploys the WAR into a stock Tomcat and runs
+a single E2E scenario against it. To reproduce that locally:
+
+```bash
+./gradlew :fineract-war:war
+docker compose -f docker-compose-war-test.yml up -d
+curl --retry 60 --retry-all-errors http://localhost:8080/fineract-provider/actuator/health
+```
+
+Tomcat serves the WAR over plain HTTP on port 8080, so point the suites at it with `BASE_URL` (E2E) or
+`BACKEND_PROTOCOL`/`BACKEND_PORT` (integration tests).
 
 
 How to run using Docker or Podman
@@ -197,7 +216,12 @@ You must go to https://localhost:8443 and remember to accept the self-signed SSL
 
 [Docker Hub](https://hub.docker.com/r/apache/fineract) has a pre-built container image of this project, built continuously.
 
-You must specify the MySQL tenants database JDBC URL by passing it to the `fineract` container via environment
+The official Fineract Docker image includes the PostgreSQL JDBC driver only. MySQL and MariaDB JDBC drivers are
+**not** included due to license incompatibility (see LICENSE section below). To use Fineract with MySQL or MariaDB,
+download the driver from the vendor and either build your own Docker image on top of the official one, mount it
+via a Docker volume, or install it from the OS package manager inside a custom image.
+
+You must specify the tenants database JDBC URL by passing it to the `fineract` container via environment
 variables; please consult the [`docker-compose.yml`](docker-compose.yml) for exact details how to specify those.
 
 The logfiles and the Java Flight Recorder output are available in `PROJECT_ROOT/build/fineract/logs`. If you use IntelliJ then you can double-click on the `.jfr` file and open it with the IDE. You can also download [Azul Mission Control](https://www.azul.com/products/components/azul-mission-control/) to analyze the Java Flight Recorder file.
@@ -327,7 +351,7 @@ Kafka support is also disabled by default. In `docker-compose-postgresql-kafka.y
 During the development Fineract was tested with PLAINTEXT Kafka brokers without authentication and with AWS MSK using IAM authentication. The extra [JAR file](https://github.com/aws/aws-msk-iam-auth/releases) required for IAM authentication is already added to the classpath.
 An example MSK setup can be found in `docker-compose-postgresql-kafka-msk.yml`.
 
-The full list of supported Kafka related properties is documented in the [Fineract Platform documentation](https://fineract.apache.org/docs/current/).
+The full list of supported Kafka related properties is documented in the [Fineract Platform documentation](https://fineract.apache.org/docs/stable/).
 
 
 DATABASE AND TABLES
@@ -390,7 +414,7 @@ NOTE: We keep backwards compatibility until one of the next releases to ensure t
 RELEASES
 ============
 
-[Official releases](https://fineract.apache.org/#downloads) are created quarterly, at the end of each quarter. Our [documented release procedure](https://fineract.apache.org/docs/current/#_releases) follows the [ASF release policy](https://www.apache.org/legal/release-policy.html).
+[Official releases](https://fineract.apache.org/#downloads) are created quarterly, at the end of each quarter. Our [documented release procedure](https://fineract.apache.org/docs/develop/#_releases) follows the [ASF release policy](https://www.apache.org/legal/release-policy.html).
 
 See <https://cwiki.apache.org/confluence/display/FINERACT/Fineract+Releases> for an archive of historical release notes along with JIRA issues relevant to each release.
 
@@ -398,7 +422,7 @@ See <https://github.com/apache/fineract/releases> for a list of PRs and contribu
 
 EOL/unsupported releases are [archived](https://www.apache.org/legal/release-policy.html#archived).
 
-Versioned build products created from the `develop` branch will include `-SNAPSHOT`. See [related settings](https://github.com/qoomon/gradle-git-versioning-plugin) near `version` and `gitVersioning` in `build.gradle` for details.
+Versioned build products created from the `develop` branch will include `-SNAPSHOT`. The version is derived from git by `GitVersionValueSource` in `buildSrc`; see the settings near `version` in `build.gradle` for details.
 
 
 LICENSE
@@ -406,12 +430,21 @@ LICENSE
 
 This project is licensed under [Apache License Version 2.0](https://github.com/apache/fineract/blob/develop/APACHE_LICENSETEXT.md).
 
-The Connector/J JDBC Driver client library from [MariaDB](https://www.mariadb.org) is licensed under the LGPL.
-The library is often used in development when running integration tests that use the Liquibase library. That JDBC
-driver is however not distributed with the Fineract product and is not required to use the product.
-If you are a developer and object to using the LGPL licensed Connector/J JDBC driver,
-simply do not run the integration tests that use the Liquibase library and use another JDBC driver.
-As discussed in [LEGAL-462](https://issues.apache.org/jira/browse/LEGAL-462), this project therefore
+The following libraries are **not** included in Fineract binary distribution artifacts (binary tarball, WAR, bootJar,
+or Docker image) because their licenses are [Category X](https://www.apache.org/legal/resolved.html#category-x)
+under the Apache Software Foundation third-party license policy:
+
+- **MariaDB Connector/J** (`org.mariadb.jdbc:mariadb-java-client`) — LGPL
+- **MySQL Connector/J** (`com.mysql:mysql-connector-j`) — GPL with FOSS exception
+- **SpotBugs Annotations** (`com.github.spotbugs:spotbugs-annotations`) — LGPL
+
+These libraries may be present on the compile classpath during development and testing but are excluded from
+all distributed artifacts. If you need MySQL or MariaDB support (both are deprecated; PostgreSQL is the
+recommended database), download the appropriate JDBC driver from the vendor's website and provide it at
+runtime via `-Dloader.path` as shown in the [How to build the JAR file](#how-to-build-the-jar-file) section above.
+
+As discussed in [LEGAL-462](https://issues.apache.org/jira/browse/LEGAL-462) and
+[LEGAL-726](https://issues.apache.org/jira/browse/LEGAL-726), this project therefore
 complies with the [Apache Software Foundation third-party license policy](https://www.apache.org/legal/resolved.html).
 
 
@@ -420,4 +453,4 @@ PLATFORM API
 
 Fineract does not provide a UI, but provides an API. Running Fineract locally, the Swagger documentation can be accessed under `https://localhost:8443/fineract-provider/swagger-ui/index.html`. A live version can be accessed via [this Sandbox](https://sandbox.mifos.community/fineract-provider/swagger-ui/index.html) (not hosted by us).
 
-Apache Fineract supports client code generation using [Swagger Codegen](https://github.com/swagger-api/swagger-codegen) based on the [OpenAPI Specification](https://swagger.io/specification/). For more instructions on how to generate client code, check [this section](https://fineract.apache.org/docs/current/#_generate_api_client) of the Fineract documentation. [This video](https://www.youtube.com/watch?v=FlVd-0YAo6c) documents the use of the Swagger-UI.
+Apache Fineract supports client code generation using [Swagger Codegen](https://github.com/swagger-api/swagger-codegen) based on the [OpenAPI Specification](https://swagger.io/specification/). For more instructions on how to generate client code, check [this section](https://fineract.apache.org/docs/develop/#_generate_api_client) of the Fineract documentation. [This video](https://www.youtube.com/watch?v=FlVd-0YAo6c) documents the use of the Swagger-UI.

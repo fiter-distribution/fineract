@@ -18,6 +18,7 @@
  */
 package org.apache.fineract.infrastructure.security.config;
 
+import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Objects;
@@ -36,6 +37,8 @@ import org.apache.fineract.infrastructure.instancemode.filter.FineractInstanceMo
 import org.apache.fineract.infrastructure.jobs.filter.LoanCOBApiFilter;
 import org.apache.fineract.infrastructure.jobs.filter.LoanCOBFilterHelper;
 import org.apache.fineract.infrastructure.jobs.filter.ProgressiveLoanModelCheckerFilter;
+import org.apache.fineract.infrastructure.jobs.filter.WorkingCapitalLoanCOBApiFilter;
+import org.apache.fineract.infrastructure.jobs.filter.WorkingCapitalLoanCOBFilterHelper;
 import org.apache.fineract.infrastructure.security.converter.FineractJwtAuthenticationTokenConverter;
 import org.apache.fineract.infrastructure.security.data.TenantAuthenticationDetails;
 import org.apache.fineract.infrastructure.security.filter.BusinessDateFilter;
@@ -62,6 +65,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
@@ -71,7 +75,6 @@ import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
@@ -82,9 +85,6 @@ import org.springframework.security.web.access.ExceptionTranslationFilter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.SecurityContextHolderFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration
@@ -106,6 +106,9 @@ public class AuthorizationServerConfig {
     @Autowired(required = false)
     private LoanCOBFilterHelper loanCOBFilterHelper;
 
+    @Autowired(required = false)
+    private WorkingCapitalLoanCOBFilterHelper workingCapitalLoanCOBFilterHelper;
+
     @Autowired
     private IdempotencyStoreHelper idempotencyStoreHelper;
 
@@ -114,7 +117,6 @@ public class AuthorizationServerConfig {
 
     @Autowired
     private FineractProperties fineractProperties;
-
     @Autowired
     private AuthTenantDetailsService tenantDetailsService;
 
@@ -148,8 +150,8 @@ public class AuthorizationServerConfig {
                 // TODO: Make it configurable
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
-                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")))
-                .apply(authorizationServerConfigurer);
+                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")));
+        http.with(authorizationServerConfigurer, Customizer.withDefaults());
 
         if (fineractProperties.getSecurity().getCors().isEnabled()) {
             http.cors(Customizer.withDefaults());
@@ -177,14 +179,21 @@ public class AuthorizationServerConfig {
                 .addFilterAfter(requestResponseFilter(), ExceptionTranslationFilter.class) //
                 .addFilterAfter(correlationHeaderFilter(), RequestResponseFilter.class) //
                 .addFilterAfter(fineractInstanceModeApiFilter(), CorrelationHeaderFilter.class); //
+
+        Class<? extends Filter> lastCobFilter;
         if (!Objects.isNull(loanCOBFilterHelper)) {
-            http.addFilterAfter(loanCOBApiFilter(), FineractInstanceModeApiFilter.class) //
-                    .addFilterAfter(idempotencyStoreFilter(), LoanCOBApiFilter.class); //
+            http.addFilterAfter(loanCOBApiFilter(), FineractInstanceModeApiFilter.class); //
             http.addFilterBefore(progressiveLoanModelCheckerFilter, LoanCOBApiFilter.class);
+            lastCobFilter = LoanCOBApiFilter.class;
         } else {
-            http.addFilterAfter(idempotencyStoreFilter(), FineractInstanceModeApiFilter.class); //
             http.addFilterAfter(progressiveLoanModelCheckerFilter, FineractInstanceModeApiFilter.class);
+            lastCobFilter = ProgressiveLoanModelCheckerFilter.class;
         }
+        if (workingCapitalLoanCOBFilterHelper != null) {
+            http.addFilterAfter(workingCapitalLoanCOBApiFilter(), lastCobFilter);
+            lastCobFilter = WorkingCapitalLoanCOBApiFilter.class;
+        }
+        http.addFilterAfter(idempotencyStoreFilter(), lastCobFilter); //
 
         if (fineractProperties.getIpTracking().isEnabled()) {
             http.addFilterAfter(callerIpTrackingFilter(), RequestResponseFilter.class);
@@ -196,21 +205,6 @@ public class AuthorizationServerConfig {
             http.cors(Customizer.withDefaults());
         }
         return http.build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
-        FineractProperties.CorsProperties corsConfiguration = fineractProperties.getSecurity().getCors();
-        config.setAllowedOriginPatterns(corsConfiguration.getAllowedOriginPatterns());
-        config.setAllowedMethods(corsConfiguration.getAllowedMethods());
-        config.setAllowedHeaders(corsConfiguration.getAllowedHeaders());
-        config.setExposedHeaders(corsConfiguration.getExposedHeaders());
-        config.setAllowCredentials(corsConfiguration.isAllowCredentials()); // if you use cookies / Authorization header
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
-        return source;
     }
 
     @Bean
@@ -235,8 +229,7 @@ public class AuthorizationServerConfig {
 
     @Bean
     public DaoAuthenticationProvider customAuthenticationProvider() {
-        DaoAuthenticationProvider authProvider = new TemporaryPasswordAwareAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
+        DaoAuthenticationProvider authProvider = new TemporaryPasswordAwareAuthenticationProvider(userDetailsService);
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
@@ -294,6 +287,10 @@ public class AuthorizationServerConfig {
 
     public LoanCOBApiFilter loanCOBApiFilter() {
         return new LoanCOBApiFilter(loanCOBFilterHelper);
+    }
+
+    public WorkingCapitalLoanCOBApiFilter workingCapitalLoanCOBApiFilter() {
+        return new WorkingCapitalLoanCOBApiFilter(workingCapitalLoanCOBFilterHelper);
     }
 
     public TwoFactorAuthenticationFilter twoFactorAuthenticationFilter() {

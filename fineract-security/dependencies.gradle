@@ -30,11 +30,11 @@ dependencies {
 
     // Spring Boot Security dependencies
     implementation(
-            'org.springframework.boot:spring-boot-starter-web',
+            'org.springframework.boot:spring-boot-starter-webmvc',
             'org.springframework.boot:spring-boot-starter-security',
-            'org.springframework.boot:spring-boot-starter-oauth2-authorization-server',
-            'org.springframework.boot:spring-boot-starter-oauth2-resource-server',
-            'org.springframework.boot:spring-boot-starter-oauth2-client',
+            'org.springframework.boot:spring-boot-starter-security-oauth2-authorization-server',
+            'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server',
+            'org.springframework.boot:spring-boot-starter-security-oauth2-client',
             'org.springframework.boot:spring-boot-starter-cache',
 
             'jakarta.ws.rs:jakarta.ws.rs-api',
@@ -47,11 +47,12 @@ dependencies {
 
             'com.jayway.jsonpath:json-path',
 
-            'com.github.spotbugs:spotbugs-annotations',
             'io.swagger.core.v3:swagger-annotations-jakarta',
 
             'org.springdoc:springdoc-openapi-starter-webmvc-ui',
             'org.mapstruct:mapstruct',
+
+            'io.github.resilience4j:resilience4j-spring-boot4',
             )
 
     // JPA for security entities
@@ -62,17 +63,6 @@ dependencies {
         exclude group: 'org.eclipse.persistence', module: 'jakarta.persistence'
     }
 
-    // OWASP ESAPI for security utilities
-    implementation('org.owasp.esapi:esapi') {
-        exclude group: 'org.slf4j'
-        exclude group: 'log4j'
-        exclude group: 'commons-logging'
-        exclude group: 'commons-collections'
-        exclude group: 'commons-lang'
-        exclude group: 'spotbugs-annotations'
-        exclude group: 'xml-apis'
-    }
-
     // Email support for OTP delivery
     implementation ('org.apache.commons:commons-email') {
         exclude group: 'com.sun.mail', module: 'javax.mail'
@@ -80,6 +70,7 @@ dependencies {
     }
     implementation 'com.sun.mail:jakarta.mail'
 
+    compileOnly 'com.github.spotbugs:spotbugs-annotations'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     annotationProcessor 'org.mapstruct:mapstruct-processor'
@@ -93,6 +84,5 @@ dependencies {
         exclude group: 'javax.activation'
         exclude group: 'org.skyscreamer'
     }
-    testImplementation ('org.mockito:mockito-inline')
     testImplementation 'org.springframework.security:spring-security-test'
 }

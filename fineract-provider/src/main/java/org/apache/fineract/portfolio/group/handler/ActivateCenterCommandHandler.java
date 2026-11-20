@@ -18,30 +18,47 @@
  */
 package org.apache.fineract.portfolio.group.handler;
 
+import lombok.RequiredArgsConstructor;
 import org.apache.fineract.commands.annotation.CommandType;
 import org.apache.fineract.commands.handler.NewCommandSourceHandler;
 import org.apache.fineract.infrastructure.core.api.JsonCommand;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
+import org.apache.fineract.infrastructure.core.data.CommandProcessingResultBuilder;
+import org.apache.fineract.portfolio.group.api.GroupingTypesApiConstants;
+import org.apache.fineract.portfolio.group.data.GroupActivateRequest;
+import org.apache.fineract.portfolio.group.data.GroupActivateResponse;
+import org.apache.fineract.portfolio.group.serialization.GroupingTypesDataValidator;
 import org.apache.fineract.portfolio.group.service.GroupingTypesWritePlatformService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @CommandType(entity = "CENTER", action = "ACTIVATE")
+@RequiredArgsConstructor
 public class ActivateCenterCommandHandler implements NewCommandSourceHandler {
 
     private final GroupingTypesWritePlatformService writePlatformService;
-
-    @Autowired
-    public ActivateCenterCommandHandler(final GroupingTypesWritePlatformService clientWritePlatformService) {
-        this.writePlatformService = clientWritePlatformService;
-    }
+    private final GroupingTypesDataValidator fromApiJsonDeserializer;
 
     @Transactional
     @Override
     public CommandProcessingResult processCommand(final JsonCommand command) {
+        this.fromApiJsonDeserializer.validateForActivation(command, GroupingTypesApiConstants.GROUP_RESOURCE_NAME);
 
-        return this.writePlatformService.activateGroupOrCenter(command.entityId(), command);
+        final GroupActivateRequest request = GroupActivateRequest.builder() //
+                .groupId(command.entityId()) //
+                .activationDate(command.stringValueOfParameterNamed("activationDate")) //
+                .locale(command.locale()) //
+                .dateFormat(command.dateFormat()) //
+                .build();
+
+        final GroupActivateResponse response = this.writePlatformService.activateGroup(request);
+
+        return new CommandProcessingResultBuilder() //
+                .withCommandId(command.commandId()) //
+                .withOfficeId(response.getOfficeId()) //
+                .withGroupId(response.getGroupId()) //
+                .withEntityId(response.getResourceId()) //
+                .build();
     }
 }

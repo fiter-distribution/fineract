@@ -48,10 +48,12 @@ import org.apache.fineract.client.models.GetWorkingCapitalLoansPagedResponse;
 import org.apache.fineract.client.models.GetWorkingCapitalLoansTemplateResponse;
 import org.apache.fineract.client.models.WorkingCapitalBreachRequest;
 import org.apache.fineract.client.models.WorkingCapitalNearBreachRequest;
-import org.apache.fineract.integrationtests.common.ClientHelper;
+import org.apache.fineract.integrationtests.client.feign.helpers.FeignClientHelper;
+import org.apache.fineract.integrationtests.client.feign.helpers.FeignDelinquencyHelper;
+import org.apache.fineract.integrationtests.client.feign.helpers.FeignFundHelper;
+import org.apache.fineract.integrationtests.client.feign.modules.ClientRequestBuilders;
+import org.apache.fineract.integrationtests.common.FineractFeignClientHelper;
 import org.apache.fineract.integrationtests.common.Utils;
-import org.apache.fineract.integrationtests.common.funds.FundsResourceHandler;
-import org.apache.fineract.integrationtests.common.products.DelinquencyBucketsHelper;
 import org.apache.fineract.integrationtests.common.workingcapitalloan.WorkingCapitalLoanApplicationTestBuilder;
 import org.apache.fineract.integrationtests.common.workingcapitalloan.WorkingCapitalLoanDisbursementTestBuilder;
 import org.apache.fineract.integrationtests.common.workingcapitalloan.WorkingCapitalLoanHelper;
@@ -64,9 +66,13 @@ import org.junit.jupiter.api.Test;
 
 public class WorkingCapitalLoanApplicationCRUDTest {
 
+    private static final FeignFundHelper FUND_HELPER = new FeignFundHelper(FineractFeignClientHelper.getFineractFeignClient());
+    private static final FeignDelinquencyHelper DELINQUENCY_HELPER = new FeignDelinquencyHelper(
+            FineractFeignClientHelper.getFineractFeignClient());
     private static Long delinquencyBucketId;
     private static Long fundId;
 
+    private final FeignClientHelper clientHelper = new FeignClientHelper(FineractFeignClientHelper.getFineractFeignClient());
     private final WorkingCapitalLoanHelper applicationHelper = new WorkingCapitalLoanHelper();
     private final WorkingCapitalLoanProductHelper productHelper = new WorkingCapitalLoanProductHelper();
     private final WorkingCapitalBreachHelper breachHelper = new WorkingCapitalBreachHelper();
@@ -74,8 +80,8 @@ public class WorkingCapitalLoanApplicationCRUDTest {
 
     @BeforeAll
     static void initDelinquency() {
-        delinquencyBucketId = DelinquencyBucketsHelper.createDefaultBucket();
-        fundId = FundsResourceHandler.createFund().getResourceId();
+        delinquencyBucketId = DELINQUENCY_HELPER.createDefaultWorkingCapitalBucket();
+        fundId = FUND_HELPER.createFund().getResourceId();
     }
 
     @Test
@@ -135,7 +141,7 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         assertEquals(productRepaymentEvery.intValue(), data.getRepaymentEvery(), "repaymentEvery should come from product");
         assertNotNull(data.getRepaymentFrequencyType());
         assertEquals(productRepaymentFrequencyType, data.getRepaymentFrequencyType().getValue());
-        assertNull(data.getDiscountProposed());
+        assertNull(data.getProposedDiscountFee());
         assertNotNull(data.getDelinquencyBucket(), "delinquencyBucket should come from product");
         assertEquals(delinquencyBucketId.longValue(), data.getDelinquencyBucket().getId(), "delinquencyBucket.id should come from product");
 
@@ -251,7 +257,7 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         final String accountNo = "wcl-get-" + UUID.randomUUID().toString().substring(0, 8);
         final String externalId = "wcl-get-ext-" + UUID.randomUUID().toString().substring(0, 8);
         final BigDecimal principal = BigDecimal.valueOf(6000);
-        final BigDecimal periodPaymentRate = new BigDecimal("18");
+        final BigDecimal periodPaymentRate = WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT;
         final BigDecimal totalPaymentVolume = BigDecimal.valueOf(100000);
         final BigDecimal discount = BigDecimal.valueOf(25);
         final LocalDate submittedOnDate = LocalDate.now(ZoneId.systemDefault());
@@ -309,7 +315,7 @@ public class WorkingCapitalLoanApplicationCRUDTest {
 
         assertNotNull(loanId);
 
-        GetClientsClientIdAccountsResponse clientAccounts = ClientHelper.getClientAccounts(clientId);
+        GetClientsClientIdAccountsResponse clientAccounts = clientHelper.getClientAccounts(clientId);
         assertNotNull(clientAccounts);
         assertFalse(clientAccounts.getWorkingCapitalLoanAccounts().isEmpty(), "Client should have at least one working capital loan");
         boolean found = false;
@@ -362,7 +368,7 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         assertNotNull(loanId3);
 
         try {
-            GetClientsClientIdAccountsResponse clientAccounts = ClientHelper.getClientAccounts(clientId);
+            GetClientsClientIdAccountsResponse clientAccounts = clientHelper.getClientAccounts(clientId);
             assertNotNull(clientAccounts);
             assertTrue(clientAccounts.getWorkingCapitalLoanAccounts().size() >= 3, "Client should have at least 3 working capital loans");
             final List<GetClientsWorkingCapitalLoanAccounts> ourLoans = new ArrayList<>();
@@ -393,7 +399,7 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         final String accountNo = "wcl-extget-" + UUID.randomUUID().toString().substring(0, 8);
         final String externalId = "wcl-by-ext-" + UUID.randomUUID().toString().substring(0, 8);
         final BigDecimal principal = BigDecimal.valueOf(7000);
-        final BigDecimal periodPaymentRate = new BigDecimal("18");
+        final BigDecimal periodPaymentRate = WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT;
         final BigDecimal totalPaymentVolume = BigDecimal.valueOf(100000);
         final BigDecimal discount = BigDecimal.ZERO;
         final LocalDate submittedOnDate = LocalDate.now(ZoneId.systemDefault());
@@ -485,12 +491,12 @@ public class WorkingCapitalLoanApplicationCRUDTest {
             assertEquals(productName, loanData.getProduct().getName());
         }
         if (loanData != null) {
-            if (loanData.getPeriodPaymentRate() != null) {
-                assertEquals(0, WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT
-                        .compareTo(loanData.getPeriodPaymentRate()));
+            if (loanData.getPaymentRate() != null) {
+                assertEquals(0,
+                        WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT.compareTo(loanData.getPaymentRate()));
             }
             if (loanData.getRepaymentEvery() != null) {
-                assertEquals(30, loanData.getRepaymentEvery());
+                assertEquals(1, loanData.getRepaymentEvery());
             }
             if (loanData.getRepaymentFrequencyType() != null) {
                 assertEquals("Days", loanData.getRepaymentFrequencyType().getValue());
@@ -508,6 +514,7 @@ public class WorkingCapitalLoanApplicationCRUDTest {
 
         assertNotNull(template.getPeriodFrequencyTypeOptions());
         assertFalse(template.getPeriodFrequencyTypeOptions().isEmpty());
+        assertThat(template.getPeriodFrequencyTypeOptions()).extracting("id").containsExactly("DAYS", "WEEKS", "MONTHS");
 
         productHelper.deleteWorkingCapitalLoanProductById(productId);
     }
@@ -585,7 +592,7 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         final String newAccountNo = "wcl-mod-" + UUID.randomUUID().toString().substring(0, 8);
         final String newExternalId = "wcl-mod-ext-" + UUID.randomUUID().toString().substring(0, 8);
         final BigDecimal principal = BigDecimal.valueOf(9000);
-        final BigDecimal periodPaymentRate = new BigDecimal("18");
+        final BigDecimal periodPaymentRate = WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT;
         final BigDecimal totalPaymentVolume = BigDecimal.valueOf(100000);
         final BigDecimal discount = BigDecimal.valueOf(100);
         final LocalDate submittedOnDate = LocalDate.now(ZoneId.systemDefault());
@@ -656,7 +663,7 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         final String accountNo = "wcl-" + UUID.randomUUID().toString().substring(0, 8);
         final String externalId = "wcl-ext-" + UUID.randomUUID().toString().substring(0, 8);
         final BigDecimal principal = BigDecimal.valueOf(7500);
-        final BigDecimal periodPaymentRate = new BigDecimal("18");
+        final BigDecimal periodPaymentRate = WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT;
         final BigDecimal totalPaymentVolume = BigDecimal.valueOf(8250);
         final BigDecimal discount = BigDecimal.valueOf(50);
         final LocalDate submittedOnDate = LocalDate.now(ZoneId.systemDefault());
@@ -712,7 +719,7 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         final String accountNo = "wcl-paged-" + UUID.randomUUID().toString().substring(0, 8);
         final String externalId = "wcl-paged-ext-" + UUID.randomUUID().toString().substring(0, 8);
         final BigDecimal principal = BigDecimal.valueOf(5500);
-        final BigDecimal periodPaymentRate = new BigDecimal("18");
+        final BigDecimal periodPaymentRate = WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT;
         final BigDecimal totalPaymentVolume = BigDecimal.valueOf(100000);
         final BigDecimal discount = BigDecimal.ZERO;
         final LocalDate submittedOnDate = LocalDate.now(ZoneId.systemDefault());
@@ -817,14 +824,14 @@ public class WorkingCapitalLoanApplicationCRUDTest {
                 .withClientId(clientId) //
                 .withProductId(productId) //
                 .withPrincipal(BigDecimal.valueOf(5000)) //
-                .withPeriodPaymentRate(new BigDecimal("18")) //
+                .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                 .withTotalPaymentVolume(BigDecimal.valueOf(100000)) //
                 .withDiscount(discountProposed) //
                 .buildSubmitRequest());
 
         GetWorkingCapitalLoansLoanIdResponse loanData = applicationHelper.retrieveLoan(loanId);
-        assertEquals(0, discountProposed.compareTo(loanData.getDiscountProposed()));
-        final LocalDate operationDate = loanData.getSubmittedOnDate();
+        assertEquals(0, discountProposed.compareTo(loanData.getProposedDiscountFee()));
+        final LocalDate operationDate = loanData.getTimeline().getSubmittedOnDate();
 
         discountProposed = BigDecimal.valueOf(99);
         final var modifyJson = new WorkingCapitalLoanApplicationTestBuilder().withDiscount(discountProposed) //
@@ -833,55 +840,55 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         final Long modifiedId = applicationHelper.modifyById(loanId, modifyJson);
         assertEquals(loanId, modifiedId);
         loanData = applicationHelper.retrieveLoan(loanId);
-        assertEquals(0, discountProposed.compareTo(loanData.getDiscountProposed()));
+        assertEquals(0, discountProposed.compareTo(loanData.getProposedDiscountFee()));
 
         // Approve the WC Loan with specific discount
         BigDecimal discountApproved = BigDecimal.valueOf(97);
         applicationHelper.approveById(loanId,
                 WorkingCapitalLoanApplicationTestBuilder.buildApproveRequest(operationDate, null, discountApproved));
         loanData = applicationHelper.retrieveLoan(loanId);
-        assertEquals(0, discountProposed.compareTo(loanData.getDiscountProposed()));
-        assertEquals(0, discountApproved.compareTo(loanData.getDiscountApproved()));
+        assertEquals(0, discountProposed.compareTo(loanData.getProposedDiscountFee()));
+        assertEquals(0, discountApproved.compareTo(loanData.getApprovedDiscountFee()));
 
         // Undo WC Loan Approval
         applicationHelper.undoApprovalById(loanId, WorkingCapitalLoanApplicationTestBuilder.buildUndoApproveRequest());
         loanData = applicationHelper.retrieveLoan(loanId);
-        assertEquals(0, discountProposed.compareTo(loanData.getDiscountProposed()));
+        assertEquals(0, discountProposed.compareTo(loanData.getProposedDiscountFee()));
         // Null as reset of Approval amount
-        assertNull(loanData.getDiscountApproved());
+        assertNull(loanData.getApprovedDiscountFee());
 
         // ReApprove the WC Loan with specific discount
         discountApproved = BigDecimal.valueOf(95);
         applicationHelper.approveById(loanId,
                 WorkingCapitalLoanApplicationTestBuilder.buildApproveRequest(operationDate, null, discountApproved));
         loanData = applicationHelper.retrieveLoan(loanId);
-        assertEquals(0, discountProposed.compareTo(loanData.getDiscountProposed()));
-        assertEquals(0, discountApproved.compareTo(loanData.getDiscountApproved()));
+        assertEquals(0, discountProposed.compareTo(loanData.getProposedDiscountFee()));
+        assertEquals(0, discountApproved.compareTo(loanData.getApprovedDiscountFee()));
 
         // Disburse the WC Loan without specific discount then It will use discountApproved
         applicationHelper.disburseById(loanId,
                 WorkingCapitalLoanDisbursementTestBuilder.buildDisburseRequest(operationDate, BigDecimal.valueOf(5000)));
         loanData = applicationHelper.retrieveLoan(loanId);
-        assertEquals(0, discountProposed.compareTo(loanData.getDiscountProposed()));
-        assertEquals(0, discountApproved.compareTo(loanData.getDiscountApproved()));
-        assertNull(loanData.getDiscount());
+        assertEquals(0, discountProposed.compareTo(loanData.getProposedDiscountFee()));
+        assertEquals(0, discountApproved.compareTo(loanData.getApprovedDiscountFee()));
+        assertNull(loanData.getDiscountFee());
 
         // Undo Disburse the WC Loan
         applicationHelper.undoDisbursalById(loanId,
                 WorkingCapitalLoanDisbursementTestBuilder.buildUndoDisburseRequest("Undo disbursal note"));
         loanData = applicationHelper.retrieveLoan(loanId);
-        assertEquals(0, discountProposed.compareTo(loanData.getDiscountProposed()));
-        assertEquals(0, discountApproved.compareTo(loanData.getDiscountApproved()));
-        assertNull(loanData.getDiscount());
+        assertEquals(0, discountProposed.compareTo(loanData.getProposedDiscountFee()));
+        assertEquals(0, discountApproved.compareTo(loanData.getApprovedDiscountFee()));
+        assertNull(loanData.getDiscountFee());
 
         // ReDisburse the WC Loan with specific discount
         BigDecimal discountDisbursement = BigDecimal.valueOf(80);
         applicationHelper.disburseById(loanId, WorkingCapitalLoanDisbursementTestBuilder.buildDisburseRequest(operationDate,
                 BigDecimal.valueOf(5000), discountDisbursement, null, null, null, null, null, null, null));
         loanData = applicationHelper.retrieveLoan(loanId);
-        assertEquals(0, discountProposed.compareTo(loanData.getDiscountProposed()));
-        assertEquals(0, discountApproved.compareTo(loanData.getDiscountApproved()));
-        assertEquals(0, discountDisbursement.compareTo(loanData.getDiscount()));
+        assertEquals(0, discountProposed.compareTo(loanData.getProposedDiscountFee()));
+        assertEquals(0, discountApproved.compareTo(loanData.getApprovedDiscountFee()));
+        assertEquals(0, discountDisbursement.compareTo(loanData.getDiscountFee()));
 
         // Undo Disbursement for delete it
         applicationHelper.undoDisbursalById(loanId,
@@ -896,10 +903,10 @@ public class WorkingCapitalLoanApplicationCRUDTest {
             final Integer repaymentEvery, final String repaymentFrequencyType, final Integer delinquencyGraceDays,
             final String delinquencyStartType) {
         assertEquals(loanId, data.getId());
-        assertNotNull(data.getClient());
-        assertEquals(clientId, data.getClient().getId());
-        assertNotNull(data.getProduct());
-        assertEquals(productId, data.getProduct().getId());
+        assertNotNull(data.getClientId());
+        assertEquals(clientId, data.getClientId());
+        assertNotNull(data.getLoanProductId());
+        assertEquals(productId, data.getLoanProductId());
         assertEquals(accountNo, data.getAccountNo());
         assertEquals(externalId, data.getExternalId());
         if (fundId != null) {
@@ -908,9 +915,8 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         assertNotNull(data.getBalance());
         assertEqualBigDecimal(principal, data.getProposedPrincipal());
         assertEqualBigDecimal(totalPaymentVolume, data.getTotalPaymentVolume());
-        assertEqualBigDecimal(periodPaymentRate, data.getPeriodPaymentRate());
-        assertEqualBigDecimal(discountProposed, data.getDiscountProposed());
-        assertEquals(submittedOnDate, data.getSubmittedOnDate());
+        assertEqualBigDecimal(periodPaymentRate, data.getPaymentRate());
+        assertEqualBigDecimal(discountProposed, data.getProposedDiscountFee());
         assertNotNull(data.getDisbursementDetails());
         assertFalse(data.getDisbursementDetails().isEmpty(), "disbursementDetails should not be empty");
         assertEquals(expectedDisbursementDate, data.getDisbursementDetails().getFirst().getExpectedDisbursementDate());
@@ -918,18 +924,15 @@ public class WorkingCapitalLoanApplicationCRUDTest {
         final GetWorkingCapitalLoansLoanIdTimeline timeline = data.getTimeline();
         assertEquals(submittedOnDate, timeline.getSubmittedOnDate());
         assertEquals(expectedDisbursementDate, timeline.getExpectedDisbursementDate());
-        assertNotNull(timeline.getDisbursementDetails());
-        assertFalse(timeline.getDisbursementDetails().isEmpty(), "timeline.disbursementDetails should not be empty");
-        assertEquals(expectedDisbursementDate, timeline.getDisbursementDetails().getFirst().getExpectedDisbursementDate());
         assertEquals(repaymentEvery.intValue(), data.getRepaymentEvery());
         assert data.getRepaymentFrequencyType() != null;
         assertEquals(repaymentFrequencyType, data.getRepaymentFrequencyType().getCode());
         assertNotNull(data.getStatus());
         assertEquals("loanStatusType.submitted.and.pending.approval", data.getStatus().getCode());
-        assertNotNull(data.getProduct().getName());
-        assertFalse(data.getProduct().getName().isBlank());
-        assertNotNull(data.getClient().getDisplayName());
-        assertFalse(data.getClient().getDisplayName().isBlank());
+        assertNotNull(data.getLoanProductName());
+        assertFalse(data.getLoanProductName().isBlank());
+        assertNotNull(data.getClientName());
+        assertFalse(data.getClientName().isBlank());
         if (data.getPaymentAllocation() != null) {
             assertFalse(data.getPaymentAllocation().isEmpty());
         }
@@ -959,9 +962,9 @@ public class WorkingCapitalLoanApplicationCRUDTest {
                 .withPrincipalAmountMin(BigDecimal.valueOf(1000)) //
                 .withPrincipalAmountMax(BigDecimal.valueOf(50000)) //
                 .withPrincipalAmountDefault(BigDecimal.valueOf(10000)) //
-                .withMinPeriodPaymentRate(new BigDecimal("18")) //
-                .withMaxPeriodPaymentRate(BigDecimal.valueOf(20)) //
-                .withPeriodPaymentRate(new BigDecimal("18")) //
+                .withMinPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_MIN_PERIOD_PAYMENT_RATE_PERCENT) //
+                .withMaxPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_MAX_PERIOD_PAYMENT_RATE_PERCENT) //
+                .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                 .withDelinquencyBucketId(delinquencyBucketId) //
                 .withAllowAttributeOverrides(Map.of(//
                         "delinquencyBucketClassification", Boolean.TRUE, //
@@ -986,9 +989,9 @@ public class WorkingCapitalLoanApplicationCRUDTest {
                 .withPrincipalAmountMin(BigDecimal.valueOf(1000)) //
                 .withPrincipalAmountMax(BigDecimal.valueOf(50000)) //
                 .withPrincipalAmountDefault(BigDecimal.valueOf(10000)) //
-                .withMinPeriodPaymentRate(new BigDecimal("18")) //
-                .withMaxPeriodPaymentRate(BigDecimal.valueOf(20)) //
-                .withPeriodPaymentRate(new BigDecimal("18")) //
+                .withMinPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_MIN_PERIOD_PAYMENT_RATE_PERCENT) //
+                .withMaxPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_MAX_PERIOD_PAYMENT_RATE_PERCENT) //
+                .withPeriodPaymentRate(WorkingCapitalLoanProductTestBuilder.DEFAULT_PERIOD_PAYMENT_RATE_PERCENT) //
                 .withDelinquencyBucketId(delinquencyBucketId) //
                 .withRepaymentEvery(repaymentEvery) //
                 .withRepaymentFrequencyType(repaymentFrequencyType) //
@@ -1032,6 +1035,6 @@ public class WorkingCapitalLoanApplicationCRUDTest {
     }
 
     private Long createClient() {
-        return ClientHelper.createClient(ClientHelper.defaultClientCreationRequest()).getClientId();
+        return clientHelper.createClient(ClientRequestBuilders.defaultClient()).getClientId();
     }
 }

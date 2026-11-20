@@ -53,6 +53,7 @@ import org.apache.fineract.commands.domain.CommandWrapper;
 import org.apache.fineract.commands.service.CommandWrapperBuilder;
 import org.apache.fineract.commands.service.PortfolioCommandSourceWritePlatformService;
 import org.apache.fineract.infrastructure.configuration.domain.ConfigurationDomainService;
+import org.apache.fineract.infrastructure.core.annotation.AlternativeOperationId;
 import org.apache.fineract.infrastructure.core.api.ApiRequestParameterHelper;
 import org.apache.fineract.infrastructure.core.data.CommandProcessingResult;
 import org.apache.fineract.infrastructure.core.data.EnumOptionData;
@@ -62,7 +63,7 @@ import org.apache.fineract.infrastructure.security.service.PlatformSecurityConte
 import org.apache.fineract.organisation.monetary.data.CurrencyData;
 import org.apache.fineract.organisation.monetary.service.CurrencyReadPlatformService;
 import org.apache.fineract.portfolio.charge.data.ChargeData;
-import org.apache.fineract.portfolio.charge.service.ChargeReadPlatformService;
+import org.apache.fineract.portfolio.charge.service.ChargeReadService;
 import org.apache.fineract.portfolio.paymenttype.data.PaymentTypeData;
 import org.apache.fineract.portfolio.paymenttype.service.PaymentTypeReadService;
 import org.apache.fineract.portfolio.savings.SavingsApiConstants;
@@ -95,7 +96,7 @@ public class SavingsProductsApiResource {
     private final ApiRequestParameterHelper apiRequestParameterHelper;
     private final AccountingDropdownReadPlatformService accountingDropdownReadPlatformService;
     private final ProductToGLAccountMappingReadPlatformService accountMappingReadPlatformService;
-    private final ChargeReadPlatformService chargeReadPlatformService;
+    private final ChargeReadService chargeReadService;
     private final PaymentTypeReadService paymentTypeReadPlatformService;
     private final TaxReadPlatformService taxReadPlatformService;
     private final ConfigurationDomainService configurationDomainService;
@@ -107,6 +108,7 @@ public class SavingsProductsApiResource {
             + "Mandatory Fields: name, shortName, description, currencyCode, digitsAfterDecimal,inMultiplesOf, nominalAnnualInterestRate, interestCompoundingPeriodType, interestCalculationType, interestCalculationDaysInYearType,accountingRule\n\n"
             + "Mandatory Fields for Cash based accounting (accountingRule = 2): savingsReferenceAccountId, savingsControlAccountId, interestOnSavingsAccountId, incomeFromFeeAccountId, transfersInSuspenseAccountId, incomeFromPenaltyAccountId\n\n"
             + "Optional Fields: minRequiredOpeningBalance, lockinPeriodFrequency, lockinPeriodFrequencyType, withdrawalFeeForTransfers, paymentChannelToFundSourceMappings, feeToIncomeAccountMappings, penaltyToIncomeAccountMappings, charges, allowOverdraft, overdraftLimit, minBalanceForInterestCalculation,withHoldTax,taxGroupId,accountMapping, lienAllowed, maxAllowedLienLimit")
+    @AlternativeOperationId("create_13")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = SavingsProductsApiResourceSwagger.PostSavingsProductsRequest.class)))
     @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = SavingsProductsApiResourceSwagger.PostSavingsProductsResponse.class)))
     public String create(@Parameter(hidden = true) final String apiRequestBodyAsJson) {
@@ -123,6 +125,7 @@ public class SavingsProductsApiResource {
     @Consumes({ MediaType.APPLICATION_JSON })
     @Produces({ MediaType.APPLICATION_JSON })
     @Operation(summary = "Update a Savings Product", operationId = "updateSavingsProduct", description = "Updates a Savings Product")
+    @AlternativeOperationId("update_22")
     @RequestBody(required = true, content = @Content(schema = @Schema(implementation = SavingsProductsApiResourceSwagger.PutSavingsProductsProductIdRequest.class)))
     @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = SavingsProductsApiResourceSwagger.PutSavingsProductsProductIdResponse.class)))
     public String update(@PathParam("productId") @Parameter(description = "productId") final Long productId,
@@ -141,6 +144,7 @@ public class SavingsProductsApiResource {
     @Produces({ MediaType.APPLICATION_JSON })
     @Operation(summary = "List Savings Products", operationId = "retrieveAllSavingsProducts", description = "Lists Savings Products\n\n"
             + "Example Requests:\n" + "\n" + "savingsproducts\n" + "\n" + "savingsproducts?fields=name")
+    @AlternativeOperationId("retrieveAll_34")
     @ApiResponse(responseCode = "200", description = "OK", content = @Content(array = @ArraySchema(schema = @Schema(implementation = SavingsProductsApiResourceSwagger.GetSavingsProductsResponse.class))))
     public String retrieveAll(@Context final UriInfo uriInfo) {
 
@@ -158,6 +162,7 @@ public class SavingsProductsApiResource {
     @Operation(summary = "Retrieve a Savings Product", operationId = "retrieveOneSavingsProduct", description = "Retrieves a Savings Product\n\n"
             + "Example Requests:\n" + "\n" + "savingsproducts/1\n" + "\n" + "savingsproducts/1?template=true\n" + "\n"
             + "savingsproducts/1?fields=name,description")
+    @AlternativeOperationId("retrieveOne_27")
     @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = SavingsProductsApiResourceSwagger.GetSavingsProductsProductIdResponse.class)))
     public String retrieveOne(@PathParam("productId") @Parameter(description = "productId") final Long productId,
             @Context final UriInfo uriInfo) {
@@ -166,7 +171,7 @@ public class SavingsProductsApiResource {
 
         SavingsProductData savingProductData = this.savingProductReadPlatformService.retrieveOne(productId);
 
-        final Collection<ChargeData> charges = this.chargeReadPlatformService.retrieveSavingsProductCharges(productId);
+        final Collection<ChargeData> charges = this.chargeReadService.retrieveSavingsProductCharges(productId);
 
         savingProductData = SavingsProductData.withCharges(savingProductData, charges);
 
@@ -199,6 +204,7 @@ public class SavingsProductsApiResource {
     @Operation(summary = "Retrieve Savings Product Template", operationId = "retrieveTemplateSavingsProduct", description = "This is a convenience resource. It can be useful when building maintenance user interface screens for client applications. The template data returned consists of any or all of:\n"
             + "\n" + "Field Defaults\n" + "Allowed description Lists\n" + "Example Request:\n" + "Account Mapping:\n" + "\n"
             + "savingsproducts/template")
+    @AlternativeOperationId("retrieveTemplate_20")
     @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = SavingsProductsApiResourceSwagger.GetSavingsProductsTemplateResponse.class)))
     public String retrieveTemplate(@Context final UriInfo uriInfo) {
 
@@ -260,10 +266,10 @@ public class SavingsProductsApiResource {
 
         // charges
         final boolean feeChargesOnly = false;
-        Collection<ChargeData> chargeOptions = this.chargeReadPlatformService.retrieveSavingsProductApplicableCharges(feeChargesOnly);
+        Collection<ChargeData> chargeOptions = this.chargeReadService.retrieveSavingsProductApplicableCharges(feeChargesOnly);
         chargeOptions = CollectionUtils.isEmpty(chargeOptions) ? null : chargeOptions;
 
-        Collection<ChargeData> penaltyOptions = this.chargeReadPlatformService.retrieveSavingsApplicablePenalties();
+        Collection<ChargeData> penaltyOptions = this.chargeReadService.retrieveSavingsApplicablePenalties();
         penaltyOptions = CollectionUtils.isEmpty(penaltyOptions) ? null : penaltyOptions;
         final Collection<TaxGroupData> taxGroupOptions = this.taxReadPlatformService.retrieveTaxGroupsForLookUp();
         SavingsProductData savingsProductToReturn = null;
@@ -288,6 +294,7 @@ public class SavingsProductsApiResource {
     @Path("{productId}")
     @Produces({ MediaType.APPLICATION_JSON })
     @Operation(summary = "Delete a Savings Product", operationId = "deleteSavingsProduct", description = "Deletes a Savings Product")
+    @AlternativeOperationId("delete_20")
     @ApiResponse(responseCode = "200", description = "OK", content = @Content(schema = @Schema(implementation = SavingsProductsApiResourceSwagger.DeleteSavingsProductsProductIdResponse.class)))
     public String delete(@PathParam("productId") @Parameter(description = "productId") final Long productId) {
 

@@ -32,10 +32,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.fineract.accounting.common.AccountingConstants.AccrualAccountsForLoan;
 import org.apache.fineract.accounting.common.AccountingConstants.LoanProductAccountingParams;
 import org.apache.fineract.accounting.common.AccountingValidations;
 import org.apache.fineract.accounting.producttoaccountmapping.service.ProductToGLAccountMappingHelper;
@@ -47,7 +51,11 @@ import org.apache.fineract.infrastructure.core.exception.InvalidJsonException;
 import org.apache.fineract.infrastructure.core.exception.PlatformApiDataValidationException;
 import org.apache.fineract.infrastructure.core.serialization.FromJsonHelper;
 import org.apache.fineract.infrastructure.core.service.MathUtil;
+import org.apache.fineract.portfolio.PortfolioProductType;
 import org.apache.fineract.portfolio.calendar.service.CalendarUtils;
+import org.apache.fineract.portfolio.charge.domain.Charge;
+import org.apache.fineract.portfolio.charge.domain.ChargeAmortizationIncomeType;
+import org.apache.fineract.portfolio.common.domain.MonthEndDueDateStrategy;
 import org.apache.fineract.portfolio.common.domain.PeriodFrequencyType;
 import org.apache.fineract.portfolio.loanaccount.api.LoanApiConstants;
 import org.apache.fineract.portfolio.loanaccount.api.LoanTransactionApiConstants;
@@ -62,6 +70,7 @@ import org.apache.fineract.portfolio.loanaccount.domain.LoanRepaymentScheduleTra
 import org.apache.fineract.portfolio.loanaccount.domain.transactionprocessor.impl.AdvancedPaymentScheduleTransactionProcessor;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleProcessingType;
 import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.LoanScheduleType;
+import org.apache.fineract.portfolio.loanaccount.loanschedule.domain.SemiMonthlyDueDaysValidator;
 import org.apache.fineract.portfolio.loanproduct.LoanProductConstants;
 import org.apache.fineract.portfolio.loanproduct.domain.AdvancedPaymentAllocationsJsonParser;
 import org.apache.fineract.portfolio.loanproduct.domain.AdvancedPaymentAllocationsValidator;
@@ -74,6 +83,7 @@ import org.apache.fineract.portfolio.loanproduct.domain.LoanProduct;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProductPaymentAllocationRule;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanProductValueConditionType;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanRescheduleStrategyMethod;
+import org.apache.fineract.portfolio.loanproduct.domain.LoanSupportedFeeRefundTypes;
 import org.apache.fineract.portfolio.loanproduct.domain.LoanSupportedInterestRefundTypes;
 import org.apache.fineract.portfolio.loanproduct.domain.RecalculationFrequencyType;
 import org.apache.fineract.portfolio.loanproduct.exception.EqualAmortizationUnsupportedFeatureException;
@@ -98,6 +108,10 @@ public final class LoanProductDataValidator {
     public static final String MAX_NUMBER_OF_REPAYMENTS = "maxNumberOfRepayments";
     public static final String REPAYMENT_EVERY = "repaymentEvery";
     public static final String REPAYMENT_FREQUENCY_TYPE = "repaymentFrequencyType";
+    /** WHOLE_TERM and INVALID are not repayment frequencies a product can be created with. */
+    private static final Object[] SUPPORTED_REPAYMENT_FREQUENCY_TYPES = { PeriodFrequencyType.DAYS.getValue(),
+            PeriodFrequencyType.WEEKS.getValue(), PeriodFrequencyType.MONTHS.getValue(), PeriodFrequencyType.YEARS.getValue(),
+            PeriodFrequencyType.SEMI_MONTHLY.getValue() };
     public static final String AMORTIZATION_TYPE = "amortizationType";
     public static final String INTEREST_TYPE = "interestType";
     public static final String INTEREST_CALCULATION_PERIOD_TYPE = "interestCalculationPeriodType";
@@ -121,13 +135,15 @@ public final class LoanProductDataValidator {
     public static final String IS_FLOATING_INTEREST_RATE_CALCULATION_ALLOWED = "isFloatingInterestRateCalculationAllowed";
     public static final String ACCOUNTING_RULE = "accountingRule";
     public static final String ENABLE_ACCRUAL_ACTIVITY_POSTING = "enableAccrualActivityPosting";
+    public static final String DATATABLES = "datatables";
 
     /**
      * The parameters supported for this command.
      */
     private static final Set<String> SUPPORTED_PARAMETERS = new HashSet<>(Arrays.asList("locale", "dateFormat", NAME, DESCRIPTION, FUND_ID,
             CURRENCY_CODE, DIGITS_AFTER_DECIMAL, IN_MULTIPLES_OF, PRINCIPAL, MIN_PRINCIPAL, MAX_PRINCIPAL, REPAYMENT_EVERY,
-            NUMBER_OF_REPAYMENTS, MIN_NUMBER_OF_REPAYMENTS, MAX_NUMBER_OF_REPAYMENTS, REPAYMENT_FREQUENCY_TYPE, INTEREST_RATE_PER_PERIOD,
+            NUMBER_OF_REPAYMENTS, MIN_NUMBER_OF_REPAYMENTS, MAX_NUMBER_OF_REPAYMENTS, REPAYMENT_FREQUENCY_TYPE,
+            LoanProductConstants.FIRST_REPAYMENT_DAY_OF_MONTH, LoanProductConstants.SECOND_REPAYMENT_DAY_OF_MONTH, INTEREST_RATE_PER_PERIOD,
             MIN_INTEREST_RATE_PER_PERIOD, MAX_INTEREST_RATE_PER_PERIOD, INTEREST_RATE_FREQUENCY_TYPE, AMORTIZATION_TYPE, INTEREST_TYPE,
             INTEREST_CALCULATION_PERIOD_TYPE, LoanProductConstants.ALLOW_PARTIAL_PERIOD_INTEREST_CALCUALTION_PARAM_NAME,
             IN_ARREARS_TOLERANCE, TRANSACTION_PROCESSING_STRATEGY_CODE, ADVANCED_PAYMENT_ALLOCATIONS, CREDIT_ALLOCATIONS,
@@ -198,19 +214,23 @@ public final class LoanProductDataValidator {
             LoanProductConstants.ENABLE_INSTALLMENT_LEVEL_DELINQUENCY, LoanProductConstants.LOAN_SCHEDULE_TYPE,
             LoanProductConstants.LOAN_SCHEDULE_PROCESSING_TYPE, LoanProductConstants.FIXED_LENGTH,
             LoanProductConstants.ENABLE_ACCRUAL_ACTIVITY_POSTING, LoanProductConstants.SUPPORTED_INTEREST_REFUND_TYPES,
-            LoanProductConstants.CHARGE_OFF_BEHAVIOUR, LoanProductConstants.INTEREST_RECOGNITION_ON_DISBURSEMENT_DATE,
+            LoanProductConstants.SUPPORTED_FEE_REFUND_TYPES, LoanProductConstants.CHARGE_OFF_BEHAVIOUR,
+            LoanProductConstants.INTEREST_RECOGNITION_ON_DISBURSEMENT_DATE,
             LoanProductConstants.DAYS_IN_YEAR_CUSTOM_STRATEGY_TYPE_PARAMETER_NAME,
-            LoanProductConstants.ENABLE_INCOME_CAPITALIZATION_PARAM_NAME,
+            LoanProductConstants.MONTH_END_DUE_DATE_STRATEGY_PARAMETER_NAME, LoanProductConstants.ENABLE_INCOME_CAPITALIZATION_PARAM_NAME,
             LoanProductConstants.CAPITALIZED_INCOME_CALCULATION_TYPE_PARAM_NAME,
             LoanProductConstants.CAPITALIZED_INCOME_STRATEGY_PARAM_NAME, LoanProductConstants.CAPITALIZED_INCOME_TYPE_PARAM_NAME,
             LoanProductConstants.ENABLE_BUY_DOWN_FEE_PARAM_NAME, LoanProductConstants.BUY_DOWN_FEE_CALCULATION_TYPE_PARAM_NAME,
             LoanProductConstants.BUY_DOWN_FEE_STRATEGY_PARAM_NAME, LoanProductConstants.BUY_DOWN_FEE_INCOME_TYPE_PARAM_NAME,
             LoanProductAccountingParams.BUY_DOWN_EXPENSE.getValue(), LoanProductAccountingParams.INCOME_FROM_BUY_DOWN.getValue(),
-            LoanProductConstants.MERCHANT_BUY_DOWN_FEE_PARAM_NAME,
+            LoanProductConstants.MERCHANT_BUY_DOWN_FEE_PARAM_NAME, LoanProductConstants.ENABLE_CHARGE_AMORTIZATION_PARAM_NAME,
             LoanProductAccountingParams.CAPITALIZED_INCOME_CLASSIFICATION_TO_INCOME_ACCOUNT_MAPPINGS.getValue(), //
             LoanProductAccountingParams.BUYDOWN_FEE_CLASSIFICATION_TO_INCOME_ACCOUNT_MAPPINGS.getValue(), //
             LoanProductConstants.ALLOW_FULL_TERM_FOR_TRANCHE_PARAM_NAME //
     ));
+
+    private static final Set<String> SUPPORTED_CREATE_PARAMETERS = Stream.concat(SUPPORTED_PARAMETERS.stream(), Stream.of(DATATABLES))
+            .collect(Collectors.toUnmodifiableSet());
 
     private static final String[] SUPPORTED_LOAN_CONFIGURABLE_ATTRIBUTES = { LoanProductConstants.amortizationTypeParamName,
             LoanProductConstants.interestTypeParamName, LoanProductConstants.transactionProcessingStrategyCodeParamName,
@@ -236,7 +256,7 @@ public final class LoanProductDataValidator {
         }
 
         final Type typeOfMap = new TypeToken<Map<String, Object>>() {}.getType();
-        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, SUPPORTED_PARAMETERS);
+        this.fromApiJsonHelper.checkForUnsupportedParameters(typeOfMap, json, SUPPORTED_CREATE_PARAMETERS);
 
         final List<ApiParameterError> dataValidationErrors = new ArrayList<>();
         final DataValidatorBuilder baseDataValidator = new DataValidatorBuilder(dataValidationErrors).resource(LOANPRODUCT);
@@ -357,7 +377,9 @@ public final class LoanProductDataValidator {
 
         final Integer repaymentFrequencyType = this.fromApiJsonHelper.extractIntegerNamed(REPAYMENT_FREQUENCY_TYPE, element,
                 Locale.getDefault());
-        baseDataValidator.reset().parameter(REPAYMENT_FREQUENCY_TYPE).value(repaymentFrequencyType).notNull().inMinMaxRange(0, 3);
+        baseDataValidator.reset().parameter(REPAYMENT_FREQUENCY_TYPE).value(repaymentFrequencyType).notNull()
+                .isOneOfTheseValues(SUPPORTED_REPAYMENT_FREQUENCY_TYPES);
+        validateSemiMonthlyRepayment(element, baseDataValidator, repaymentFrequencyType, repaymentEvery, true);
 
         // settings
         final Integer amortizationType = this.fromApiJsonHelper.extractIntegerNamed(AMORTIZATION_TYPE, element, Locale.getDefault());
@@ -895,6 +917,19 @@ public final class LoanProductDataValidator {
         }
 
         if (AdvancedPaymentScheduleTransactionProcessor.ADVANCED_PAYMENT_ALLOCATION_STRATEGY.equals(transactionProcessingStrategyCode)
+                && this.fromApiJsonHelper.parameterExists(LoanProductConstants.SUPPORTED_FEE_REFUND_TYPES, element)) {
+            final String[] supportedTransactionsForFeeRefund = this.fromApiJsonHelper
+                    .extractArrayNamed(LoanProductConstants.SUPPORTED_FEE_REFUND_TYPES, element);
+            Arrays.stream(supportedTransactionsForFeeRefund)
+                    .forEach(value -> baseDataValidator.reset().parameter(LoanProductConstants.SUPPORTED_FEE_REFUND_TYPES).value(value)
+                            .isOneOfEnumValues(LoanSupportedFeeRefundTypes.class));
+        } else if (this.fromApiJsonHelper.parameterExists(LoanProductConstants.SUPPORTED_FEE_REFUND_TYPES, element)) {
+            baseDataValidator.reset().parameter(LoanProductConstants.SUPPORTED_FEE_REFUND_TYPES).failWithCode(
+                    "supported.only.for.progressive.loan.schedule.handling",
+                    "Automatic fee refund functionality is only supported for Progressive loans");
+        }
+
+        if (AdvancedPaymentScheduleTransactionProcessor.ADVANCED_PAYMENT_ALLOCATION_STRATEGY.equals(transactionProcessingStrategyCode)
                 && this.fromApiJsonHelper.parameterExists(LoanProductConstants.CHARGE_OFF_BEHAVIOUR, element)) {
             String chargeOffBehaviour = this.fromApiJsonHelper.extractStringNamed(LoanProductConstants.CHARGE_OFF_BEHAVIOUR, element);
             baseDataValidator.reset().parameter(LoanProductConstants.CHARGE_OFF_BEHAVIOUR).value(chargeOffBehaviour)
@@ -909,7 +944,20 @@ public final class LoanProductDataValidator {
 
         validateBuyDownFee(transactionProcessingStrategyCode, element, baseDataValidator, accountingRuleType);
 
+        validateChargeAmortization(transactionProcessingStrategyCode, element, baseDataValidator, accountingRuleType, null);
+
+        validateMonthEndDueDateStrategy(element, baseDataValidator);
+
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
+    }
+
+    public void validateMonthEndDueDateStrategy(final JsonElement element, final DataValidatorBuilder baseDataValidator) {
+        if (this.fromApiJsonHelper.parameterExists(LoanProductConstants.MONTH_END_DUE_DATE_STRATEGY_PARAMETER_NAME, element)) {
+            final String monthEndDueDateStrategy = this.fromApiJsonHelper
+                    .extractStringNamed(LoanProductConstants.MONTH_END_DUE_DATE_STRATEGY_PARAMETER_NAME, element);
+            baseDataValidator.reset().parameter(LoanProductConstants.MONTH_END_DUE_DATE_STRATEGY_PARAMETER_NAME)
+                    .value(monthEndDueDateStrategy).ignoreIfNull().isOneOfEnumValues(MonthEndDueDateStrategy.class);
+        }
     }
 
     private void validateAutoRepaymentForDownPayment(Boolean enableDownPayment, DataValidatorBuilder baseDataValidator,
@@ -1440,11 +1488,19 @@ public final class LoanProductDataValidator {
             baseDataValidator.reset().parameter(REPAYMENT_EVERY).value(repaymentEvery).notNull().integerGreaterThanZero();
         }
 
+        final Integer storedRepaymentFrequencyType = loanProduct.getLoanProductRelatedDetail().getRepaymentPeriodFrequencyType() == null
+                ? null
+                : loanProduct.getLoanProductRelatedDetail().getRepaymentPeriodFrequencyType().getValue();
+        Integer repaymentFrequencyType = storedRepaymentFrequencyType;
         if (this.fromApiJsonHelper.parameterExists(REPAYMENT_FREQUENCY_TYPE, element)) {
-            final Integer repaymentFrequencyType = this.fromApiJsonHelper.extractIntegerNamed(REPAYMENT_FREQUENCY_TYPE, element,
-                    Locale.getDefault());
-            baseDataValidator.reset().parameter(REPAYMENT_FREQUENCY_TYPE).value(repaymentFrequencyType).notNull().inMinMaxRange(0, 3);
+            repaymentFrequencyType = this.fromApiJsonHelper.extractIntegerNamed(REPAYMENT_FREQUENCY_TYPE, element, Locale.getDefault());
+            baseDataValidator.reset().parameter(REPAYMENT_FREQUENCY_TYPE).value(repaymentFrequencyType).notNull()
+                    .isOneOfTheseValues(SUPPORTED_REPAYMENT_FREQUENCY_TYPES);
         }
+        // A product that is already semi-monthly keeps its stored days, so a request that resends the same frequency
+        // without the days is fine; only a change of frequency has to bring both days along.
+        validateSemiMonthlyRepayment(element, baseDataValidator, repaymentFrequencyType, repaymentEvery,
+                !Objects.equals(repaymentFrequencyType, storedRepaymentFrequencyType));
 
         String transactionProcessingStrategyCode = loanProduct.getTransactionProcessingStrategyCode();
         if (this.fromApiJsonHelper.parameterExists(TRANSACTION_PROCESSING_STRATEGY_CODE, element)) {
@@ -2031,6 +2087,10 @@ public final class LoanProductDataValidator {
         validateIncomeCapitalization(transactionProcessingStrategyCode, element, baseDataValidator, accountingRuleType);
 
         validateBuyDownFee(transactionProcessingStrategyCode, element, baseDataValidator, accountingRuleType);
+
+        validateChargeAmortization(transactionProcessingStrategyCode, element, baseDataValidator, accountingRuleType, loanProduct);
+
+        validateMonthEndDueDateStrategy(element, baseDataValidator);
 
         throwExceptionIfValidationWarningsExist(dataValidationErrors);
     }
@@ -2860,6 +2920,92 @@ public final class LoanProductDataValidator {
         }
     }
 
+    /**
+     * Validates the {@code enableChargeAmortization} flag of a create or update request. On update, values that are not
+     * in the request are taken from the loan product.
+     */
+    private void validateChargeAmortization(final String transactionProcessingStrategyCode, final JsonElement element,
+            final DataValidatorBuilder baseDataValidator, final Integer accountingRuleType, final LoanProduct loanProduct) {
+        final String paramName = LoanProductConstants.ENABLE_CHARGE_AMORTIZATION_PARAM_NAME;
+        boolean enableChargeAmortization = loanProduct != null && loanProduct.getLoanProductRelatedDetail().isEnableChargeAmortization();
+        if (this.fromApiJsonHelper.parameterExists(paramName, element)) {
+            final Boolean value = this.fromApiJsonHelper.extractBooleanNamed(paramName, element);
+            baseDataValidator.reset().parameter(paramName).value(value).ignoreIfNull().validateForBooleanValue();
+            enableChargeAmortization = Boolean.TRUE.equals(value);
+        }
+        if (!enableChargeAmortization) {
+            return;
+        }
+
+        if (!AdvancedPaymentScheduleTransactionProcessor.ADVANCED_PAYMENT_ALLOCATION_STRATEGY.equals(transactionProcessingStrategyCode)) {
+            baseDataValidator.reset().parameter(paramName).failWithCodeAndMessage("supported.only.for.progressive.loan.charge.amortization",
+                    "Charge amortization is only supported for Progressive loans");
+        }
+
+        Integer effectiveAccountingRuleType = accountingRuleType;
+        if (effectiveAccountingRuleType == null && loanProduct != null && loanProduct.getAccountingRule() != null) {
+            effectiveAccountingRuleType = loanProduct.getAccountingRule().getValue();
+        }
+        if (AccountingValidations.isCashBasedAccounting(effectiveAccountingRuleType)) {
+            baseDataValidator.reset().parameter(paramName).failWithCodeAndMessage("not.supported.for.cash.based.accounting",
+                    "Charge amortization is not supported with cash based accounting");
+        }
+
+        // Accounting: on update the mapping may already be stored, which validateChargeAmortization(LoanProduct) checks
+        if (loanProduct == null && AccountingValidations.isAccrualBasedAccounting(accountingRuleType)) {
+            final Long deferredIncomeLiabilityAccountId = this.fromApiJsonHelper
+                    .extractLongNamed(LoanProductAccountingParams.DEFERRED_INCOME_LIABILITY.getValue(), element);
+            baseDataValidator.reset().parameter(LoanProductAccountingParams.DEFERRED_INCOME_LIABILITY.getValue())
+                    .value(deferredIncomeLiabilityAccountId).notNull()
+                    .cantBeBlankWhenParameterProvidedIs(LoanProductConstants.ENABLE_CHARGE_AMORTIZATION_PARAM_NAME, true)
+                    .integerGreaterThanZero();
+        }
+    }
+
+    /**
+     * Validates the charge amortization rules that depend on the stored state of a created or updated loan product:
+     * amortized charges can be attached only when charge amortization is enabled, and with accrual accounting the GL
+     * accounts that the amortization posts to must be mapped.
+     */
+    public void validateChargeAmortization(final LoanProduct loanProduct) {
+        final List<ApiParameterError> dataValidationErrors = new ArrayList<>();
+        final DataValidatorBuilder baseDataValidator = new DataValidatorBuilder(dataValidationErrors).resource(LOANPRODUCT);
+
+        final List<Charge> amortizedCharges = loanProduct.getCharges() == null ? List.of()
+                : loanProduct.getCharges().stream().filter(Charge::isAmortized).toList();
+
+        if (!loanProduct.getLoanProductRelatedDetail().isEnableChargeAmortization()) {
+            if (!amortizedCharges.isEmpty()) {
+                final List<Long> chargeIds = amortizedCharges.stream().map(Charge::getId).toList();
+                baseDataValidator.reset().parameter("charges").value(chargeIds).failWithCodeAndMessage("charge.amortization.not.enabled",
+                        "Amortized charges " + chargeIds + " can be attached only to a loan product with charge amortization enabled");
+            }
+        } else if (loanProduct.getAccountingRule() != null
+                && AccountingValidations.isAccrualBasedAccounting(loanProduct.getAccountingRule().getValue())) {
+            validateChargeAmortizationAccountMapping(baseDataValidator, loanProduct, LoanProductAccountingParams.FEES_RECEIVABLE,
+                    AccrualAccountsForLoan.FEES_RECEIVABLE);
+            validateChargeAmortizationAccountMapping(baseDataValidator, loanProduct, LoanProductAccountingParams.DEFERRED_INCOME_LIABILITY,
+                    AccrualAccountsForLoan.DEFERRED_INCOME_LIABILITY);
+            validateChargeAmortizationAccountMapping(baseDataValidator, loanProduct, LoanProductAccountingParams.INCOME_FROM_FEES,
+                    AccrualAccountsForLoan.INCOME_FROM_FEES);
+            if (amortizedCharges.stream().anyMatch(charge -> ChargeAmortizationIncomeType.INTEREST == charge.getAmortizationIncomeType())) {
+                validateChargeAmortizationAccountMapping(baseDataValidator, loanProduct, LoanProductAccountingParams.INTEREST_ON_LOANS,
+                        AccrualAccountsForLoan.INTEREST_ON_LOANS);
+            }
+        }
+
+        throwExceptionIfValidationWarningsExist(dataValidationErrors);
+    }
+
+    private void validateChargeAmortizationAccountMapping(final DataValidatorBuilder baseDataValidator, final LoanProduct loanProduct,
+            final LoanProductAccountingParams param, final AccrualAccountsForLoan accountType) {
+        if (!productToGLAccountMappingHelper.hasCoreProductToAccountMapping(loanProduct.getId(), PortfolioProductType.LOAN,
+                accountType.getValue())) {
+            baseDataValidator.reset().parameter(param.getValue()).failWithCodeAndMessage("required.when.charge.amortization.enabled",
+                    "The " + param.getValue() + " mapping is required when charge amortization is enabled with accrual accounting");
+        }
+    }
+
     private void validateIncomeCapitalization(String transactionProcessingStrategyCode, JsonElement element,
             DataValidatorBuilder baseDataValidator, Integer accountingRuleType) {
         if (this.fromApiJsonHelper.parameterExists(LoanProductConstants.CAPITALIZED_INCOME_CALCULATION_TYPE_PARAM_NAME, element)) {
@@ -3014,5 +3160,41 @@ public final class LoanProductDataValidator {
 
     private Integer defaultToZeroIfNull(Integer value) {
         return value != null ? value : 0;
+    }
+
+    /**
+     * A semi-monthly loan is repaid on two fixed days of every calendar month, so it needs both of those days and it
+     * cannot repeat on a multiple of its period. The days are set as a pair, so that a product never ends up with one
+     * new day next to an old one that no longer fits it.
+     */
+    private void validateSemiMonthlyRepayment(final JsonElement element, final DataValidatorBuilder baseDataValidator,
+            final Integer repaymentFrequencyType, final Integer repaymentEvery, final boolean frequencyIsChanging) {
+        final boolean isSemiMonthly = PeriodFrequencyType.SEMI_MONTHLY.getValue().equals(repaymentFrequencyType);
+        final boolean firstDayIsBeingSet = this.fromApiJsonHelper.parameterExists(LoanProductConstants.FIRST_REPAYMENT_DAY_OF_MONTH,
+                element);
+        final boolean secondDayIsBeingSet = this.fromApiJsonHelper.parameterExists(LoanProductConstants.SECOND_REPAYMENT_DAY_OF_MONTH,
+                element);
+
+        if (firstDayIsBeingSet || secondDayIsBeingSet) {
+            final Integer firstRepaymentDayOfMonth = this.fromApiJsonHelper
+                    .extractIntegerWithLocaleNamed(LoanProductConstants.FIRST_REPAYMENT_DAY_OF_MONTH, element);
+            final Integer secondRepaymentDayOfMonth = this.fromApiJsonHelper
+                    .extractIntegerWithLocaleNamed(LoanProductConstants.SECOND_REPAYMENT_DAY_OF_MONTH, element);
+            SemiMonthlyDueDaysValidator.validate(baseDataValidator, firstRepaymentDayOfMonth, secondRepaymentDayOfMonth);
+            if (!isSemiMonthly) {
+                baseDataValidator.reset()
+                        .parameter(firstDayIsBeingSet ? LoanProductConstants.FIRST_REPAYMENT_DAY_OF_MONTH
+                                : LoanProductConstants.SECOND_REPAYMENT_DAY_OF_MONTH)
+                        .failWithCode("supported.only.for.semi.monthly.repayment.frequency");
+            }
+        } else if (isSemiMonthly && frequencyIsChanging) {
+            baseDataValidator.reset().parameter(LoanProductConstants.FIRST_REPAYMENT_DAY_OF_MONTH).value(null).notNull();
+            baseDataValidator.reset().parameter(LoanProductConstants.SECOND_REPAYMENT_DAY_OF_MONTH).value(null).notNull();
+        }
+
+        if (isSemiMonthly && repaymentEvery != null && repaymentEvery != 1) {
+            baseDataValidator.reset().parameter(REPAYMENT_EVERY).value(repaymentEvery)
+                    .failWithCode("must.be.one.for.semi.monthly.repayment.frequency");
+        }
     }
 }

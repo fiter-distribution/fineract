@@ -74,13 +74,14 @@ public class SavingsProductWritePlatformServiceJpaRepositoryImpl implements Savi
         String param = null;
         Object[] msgArgs;
         Throwable checkEx = realCause == null ? dae : realCause;
-        if (checkEx.getMessage().contains("sp_unq_name")) {
+        if (checkEx.getMessage().contains("sp_unq_name") || checkEx.getMessage().contains("m_savings_product_name_key")) {
             final String name = command.stringValueOfParameterNamed("name");
             msgCode += ".duplicate.name";
             msg = "Savings product with name `" + name + "` already exists";
             param = "name";
             msgArgs = new Object[] { name, dae };
-        } else if (checkEx.getMessage().contains("sp_unq_short_name")) {
+        } else if (checkEx.getMessage().contains("sp_unq_short_name")
+                || checkEx.getMessage().contains("m_savings_product_short_name_key")) {
             final String shortName = command.stringValueOfParameterNamed("shortName");
             msgCode += ".duplicate.short.name";
             msg = "Savings product with short name `" + shortName + "` already exists";
@@ -90,7 +91,7 @@ public class SavingsProductWritePlatformServiceJpaRepositoryImpl implements Savi
             msgCode += ".unknown.data.integrity.issue";
             msgArgs = new Object[] { dae };
         }
-        log.error("Error occured.", dae);
+        log.error("Error occurred.", dae);
         throw ErrorHandler.getMappable(dae, msgCode, msg, param, msgArgs);
     }
 

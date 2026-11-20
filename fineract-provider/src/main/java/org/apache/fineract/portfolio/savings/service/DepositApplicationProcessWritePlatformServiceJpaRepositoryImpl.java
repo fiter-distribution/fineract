@@ -102,6 +102,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class DepositApplicationProcessWritePlatformServiceJpaRepositoryImpl implements DepositApplicationProcessWritePlatformService {
 
     private final PlatformSecurityContext context;
+    private final DepositAccountInterestCalculationService depositAccountInterestCalculationService;
     private final SavingsAccountRepositoryWrapper savingAccountRepository;
     private final FixedDepositAccountRepository fixedDepositAccountRepository;
     private final RecurringDepositAccountRepository recurringDepositAccountRepository;
@@ -131,13 +132,14 @@ public class DepositApplicationProcessWritePlatformServiceJpaRepositoryImpl impl
         String param = null;
         Object[] msgArgs;
         Throwable checkEx = realCause == null ? dve : realCause;
-        if (checkEx.getMessage().contains("sa_account_no_UNIQUE")) {
+        if (checkEx.getMessage().contains("sa_account_no_UNIQUE") || checkEx.getMessage().contains("m_savings_account_account_no_key")) {
             final String accountNo = command.stringValueOfParameterNamed("accountNo");
             msgCode += ".duplicate.accountNo";
             msg = "Savings account with accountNo " + accountNo + " already exists";
             param = "accountNo";
             msgArgs = new Object[] { accountNo, dve };
-        } else if (checkEx.getMessage().contains("sa_external_id_UNIQUE")) {
+        } else if (checkEx.getMessage().contains("sa_external_id_UNIQUE")
+                || checkEx.getMessage().contains("m_savings_account_external_id_key")) {
             final String externalId = command.stringValueOfParameterNamed("externalId");
             msgCode += ".duplicate.externalId";
             msg = "Savings account with externalId " + externalId + " already exists";
@@ -147,7 +149,7 @@ public class DepositApplicationProcessWritePlatformServiceJpaRepositoryImpl impl
             msgCode += ".unknown.data.integrity.issue";
             msgArgs = new Object[] { dve };
         }
-        log.error("Error occured.", dve);
+        log.error("Error occurred.", dve);
         throw ErrorHandler.getMappable(dve, msgCode, msg, param, msgArgs);
     }
 
@@ -168,12 +170,12 @@ public class DepositApplicationProcessWritePlatformServiceJpaRepositoryImpl impl
             final MathContext mc = MathContext.DECIMAL64;
             final boolean isPreMatureClosure = false;
 
-            account.updateMaturityDateAndAmountBeforeAccountActivation(mc, isPreMatureClosure, isSavingsInterestPostingAtCurrentPeriodEnd,
-                    financialYearBeginningMonth);
+            this.depositAccountInterestCalculationService.updateMaturityDateAndAmountBeforeAccountActivation(account, mc,
+                    isPreMatureClosure, isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth);
             this.fixedDepositAccountRepository.saveAndFlush(account);
 
             if (account.isAccountNumberRequiresAutoGeneration()) {
-                AccountNumberFormat accountNumberFormat = this.accountNumberFormatRepository.findByAccountType(EntityAccountType.CLIENT);
+                AccountNumberFormat accountNumberFormat = this.accountNumberFormatRepository.findByAccountType(EntityAccountType.SAVINGS);
                 account.updateAccountNo(this.accountNumberGenerator.generate(account, accountNumberFormat));
 
                 this.savingAccountRepository.save(account);
@@ -247,8 +249,8 @@ public class DepositApplicationProcessWritePlatformServiceJpaRepositoryImpl impl
             frequency = frequency == -1 ? 1 : frequency;
             account.generateSchedule(frequencyType, frequency, calendar);
             final boolean isPreMatureClosure = false;
-            account.updateMaturityDateAndAmount(mc, isPreMatureClosure, isSavingsInterestPostingAtCurrentPeriodEnd,
-                    financialYearBeginningMonth);
+            this.depositAccountInterestCalculationService.updateMaturityDateAndAmount(account, mc, isPreMatureClosure,
+                    isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth);
             account.validateApplicableInterestRate();
             savingAccountRepository.save(account);
             businessEventNotifierService.notifyPostBusinessEvent(new RecurringDepositAccountCreateBusinessEvent(account));
@@ -350,10 +352,14 @@ public class DepositApplicationProcessWritePlatformServiceJpaRepositoryImpl impl
 
             if (!changes.isEmpty()) {
                 updateFDAndRDCommonChanges(changes, command, account);
+                if (changes.containsKey(org.apache.fineract.portfolio.savings.SavingsApiConstants.productIdParamName)
+                        || changes.containsKey(org.apache.fineract.portfolio.savings.SavingsApiConstants.submittedOnDateParamName)) {
+                    this.depositAccountAssembler.validateProductApplicationDate(account.getSubmittedOnDate(), account.savingsProduct());
+                }
                 final MathContext mc = MathContext.DECIMAL64;
                 final boolean isPreMatureClosure = false;
-                account.updateMaturityDateAndAmountBeforeAccountActivation(mc, isPreMatureClosure,
-                        isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth);
+                this.depositAccountInterestCalculationService.updateMaturityDateAndAmountBeforeAccountActivation(account, mc,
+                        isPreMatureClosure, isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth);
                 this.savingAccountRepository.save(account);
             }
 
@@ -440,6 +446,10 @@ public class DepositApplicationProcessWritePlatformServiceJpaRepositoryImpl impl
 
             if (!changes.isEmpty()) {
                 updateFDAndRDCommonChanges(changes, command, account);
+                if (changes.containsKey(org.apache.fineract.portfolio.savings.SavingsApiConstants.productIdParamName)
+                        || changes.containsKey(org.apache.fineract.portfolio.savings.SavingsApiConstants.submittedOnDateParamName)) {
+                    this.depositAccountAssembler.validateProductApplicationDate(account.getSubmittedOnDate(), account.savingsProduct());
+                }
                 final MathContext mc = MathContext.DECIMAL64;
                 final CalendarInstance calendarInstance = this.calendarInstanceRepository.findByEntityIdAndEntityTypeIdAndCalendarTypeId(
                         accountId, CalendarEntityType.SAVINGS.getValue(), CalendarType.COLLECTION.getValue());
@@ -449,8 +459,8 @@ public class DepositApplicationProcessWritePlatformServiceJpaRepositoryImpl impl
                 frequency = frequency == -1 ? 1 : frequency;
                 account.generateSchedule(frequencyType, frequency, calendar);
                 final boolean isPreMatureClosure = false;
-                account.updateMaturityDateAndAmount(mc, isPreMatureClosure, isSavingsInterestPostingAtCurrentPeriodEnd,
-                        financialYearBeginningMonth);
+                this.depositAccountInterestCalculationService.updateMaturityDateAndAmount(account, mc, isPreMatureClosure,
+                        isSavingsInterestPostingAtCurrentPeriodEnd, financialYearBeginningMonth);
                 account.validateApplicableInterestRate();
                 this.savingAccountRepository.save(account);
 

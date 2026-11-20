@@ -25,25 +25,24 @@ dependencies {
     implementation(
             'org.springframework.boot:spring-boot-starter',
             'org.springframework.boot:spring-boot-starter-data-jdbc',
-            'io.github.resilience4j:resilience4j-spring-boot3',
+            'io.github.resilience4j:resilience4j-spring-boot4',
 
-            'com.fasterxml.jackson.core:jackson-databind',
+            'tools.jackson.core:jackson-databind',
 
             'org.liquibase:liquibase-core',
 
-            'com.mysql:mysql-connector-j',
             'org.postgresql:postgresql',
-            'org.mariadb.jdbc:mariadb-java-client',
 
             'org.apache.commons:commons-lang3',
 
-            'com.github.spotbugs:spotbugs-annotations',
             'org.mapstruct:mapstruct',
             )
+    compileOnly 'com.github.spotbugs:spotbugs-annotations'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     annotationProcessor 'org.mapstruct:mapstruct-processor'
 
+    testImplementation 'org.springframework.boot:spring-boot-liquibase'
     testImplementation(project(path: ':fineract-command-test'))
     testImplementation ('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'com.jayway.jsonpath', module: 'json-path'
@@ -52,8 +51,11 @@ dependencies {
         exclude group: 'javax.activation'
         exclude group: 'org.skyscreamer'
     }
+    testRuntimeOnly(
+            'org.mariadb.jdbc:mariadb-java-client',
+            'com.mysql:mysql-connector-j',
+            )
     testImplementation (
-            'org.mockito:mockito-inline',
             'org.testcontainers:junit-jupiter',
             'org.testcontainers:postgresql',
             'org.testcontainers:mariadb',

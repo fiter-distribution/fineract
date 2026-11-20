@@ -33,7 +33,7 @@ import org.apache.fineract.accounting.common.AccountingConstants.AccrualAccounts
 import org.apache.fineract.accounting.glaccount.domain.GLAccount;
 import org.apache.fineract.accounting.journalentry.data.LoanDTO;
 import org.apache.fineract.accounting.journalentry.data.LoanTransactionDTO;
-import org.apache.fineract.accounting.journalentry.service.AccountingProcessorHelper;
+import org.apache.fineract.accounting.journalentry.service.AccountingProcessorHelperImpl;
 import org.apache.fineract.accounting.journalentry.service.AccrualBasedAccountingProcessorForLoan;
 import org.apache.fineract.accounting.producttoaccountmapping.domain.ProductToGLAccountMapping;
 import org.apache.fineract.organisation.office.domain.Office;
@@ -52,7 +52,7 @@ class CreateJournalEntriesForChargeOffLoanTest {
     private static final Long chargeOffReasonId = 15L;
 
     @Mock
-    private AccountingProcessorHelper helper;
+    private AccountingProcessorHelperImpl helper;
     @InjectMocks
     private AccrualBasedAccountingProcessorForLoan processor;
     private LoanDTO loanDTO;
@@ -70,7 +70,7 @@ class CreateJournalEntriesForChargeOffLoanTest {
 
         LoanTransactionDTO loanTransactionDTO = new LoanTransactionDTO(1L, 1L, "txn-123", LocalDate.now(ZoneId.systemDefault()),
                 transactionType, new BigDecimal("500.00"), new BigDecimal("500.00"), null, null, null, null, false, Collections.emptyList(),
-                Collections.emptyList(), false, "", null, null, null, null);
+                Collections.emptyList(), false, "", null, null, null, null, null);
 
         loanDTO = new LoanDTO(1L, 1L, 1L, "USD", false, true, true, List.of(loanTransactionDTO), false, false, chargeOffReasonId, false,
                 false, null, null, null);

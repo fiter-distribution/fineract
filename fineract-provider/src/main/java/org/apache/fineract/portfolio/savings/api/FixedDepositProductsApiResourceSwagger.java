@@ -19,6 +19,7 @@
 package org.apache.fineract.portfolio.savings.api;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Set;
 
@@ -52,14 +53,24 @@ final class FixedDepositProductsApiResourceSwagger {
                 public Integer toPeriod;
                 @Schema(example = "4.5")
                 public Double annualInterestRate;
+                @Schema(example = "1000")
+                public BigDecimal amountRangeFrom;
+                @Schema(example = "5000")
+                public BigDecimal amountRangeTo;
+                @Schema(example = "en")
+                public String locale;
             }
 
             @Schema(example = "01 Jan 2014")
             public String fromDate;
+            @Schema(example = "01 Jan 2015")
+            public String endDate;
             @Schema(example = "en")
             public String locale;
             @Schema(example = "dd MMMM yyyy")
             public String dateFormat;
+            @Schema(example = "false")
+            public Boolean isPrimaryGroupingByAmount;
             public Set<PostFixedDepositProductsChartSlabs> chartSlabs;
         }
 
@@ -69,6 +80,10 @@ final class FixedDepositProductsApiResourceSwagger {
         public String shortName;
         @Schema(example = "Daily compounding using Daily Balance, 5% per year, 365 days in year")
         public String description;
+        @Schema(example = "10 July 2022")
+        public String startDate;
+        @Schema(example = "10 July 2022")
+        public String closeDate;
         @Schema(example = "USD")
         public String currencyCode;
         @Schema(example = "2")
@@ -77,6 +92,8 @@ final class FixedDepositProductsApiResourceSwagger {
         public Integer inMultiplesOf;
         @Schema(example = "en")
         public String locale;
+        @Schema(example = "dd MMMM yyyy")
+        public String dateFormat;
         @Schema(example = "1")
         public Integer interestCompoundingPeriodType;
         @Schema(example = "4")
@@ -101,6 +118,38 @@ final class FixedDepositProductsApiResourceSwagger {
         public Integer maxDepositTerm;
         @Schema(example = "3")
         public Integer maxDepositTermTypeId;
+        @Schema(example = "2")
+        public Integer inMultiplesOfDepositTerm;
+        @Schema(example = "2")
+        public Integer inMultiplesOfDepositTermTypeId;
+        @Schema(example = "100000")
+        public BigDecimal depositAmount;
+        @Schema(example = "1")
+        public Integer lockinPeriodFrequency;
+        @Schema(example = "2")
+        public Integer lockinPeriodFrequencyType;
+        @Schema(example = "false")
+        public Boolean withHoldTax;
+        @Schema(example = "1")
+        public Long taxGroupId;
+        @Schema(example = "1")
+        public Long savingsReferenceAccountId;
+        @Schema(example = "2")
+        public Long savingsControlAccountId;
+        @Schema(example = "3")
+        public Long transfersInSuspenseAccountId;
+        @Schema(example = "4")
+        public Long interestOnSavingsAccountId;
+        @Schema(example = "5")
+        public Long incomeFromFeeAccountId;
+        @Schema(example = "6")
+        public Long incomeFromPenaltyAccountId;
+        @Schema(example = "7")
+        public Long feesReceivableAccountId;
+        @Schema(example = "8")
+        public Long penaltiesReceivableAccountId;
+        @Schema(example = "9")
+        public Long interestPayableAccountId;
         public Set<PostFixedDepositProductsCharts> charts;
     }
 
@@ -120,8 +169,14 @@ final class FixedDepositProductsApiResourceSwagger {
 
         @Schema(example = "Fixed deposit product new offerings")
         public String description;
+        @Schema(example = "10 July 2022")
+        public String startDate;
+        @Schema(example = "10 July 2022")
+        public String closeDate;
         @Schema(example = "en")
         public String locale;
+        @Schema(example = "dd MMMM yyyy")
+        public String dateFormat;
         @Schema(example = "5")
         public Integer minDepositTerm;
         @Schema(example = "1")
@@ -139,6 +194,10 @@ final class FixedDepositProductsApiResourceSwagger {
 
             @Schema(example = "Fixed deposit product new offerings")
             public String description;
+            @Schema(example = "10 July 2022")
+            public String startDate;
+            @Schema(example = "10 July 2022")
+            public String closeDate;
             @Schema(example = "5")
             public Integer minDepositTerm;
         }
@@ -265,6 +324,12 @@ final class FixedDepositProductsApiResourceSwagger {
         public String shortName;
         @Schema(example = "FD01")
         public String description;
+        @Schema(example = "[2013, 9, 2]")
+        public LocalDate startDate;
+        @Schema(example = "[2014, 2, 7]")
+        public LocalDate closeDate;
+        @Schema(example = "savingsProduct.active")
+        public String status;
         public GetFixedDepositProductsCurrency currency;
         @Schema(example = "false")
         public Boolean preClosurePenalApplicable;
@@ -491,6 +556,12 @@ final class FixedDepositProductsApiResourceSwagger {
         public String shortName;
         @Schema(example = "Daily compounding using Daily Balance, 5% per year, 365 days in year")
         public String description;
+        @Schema(example = "[2013, 9, 2]")
+        public LocalDate startDate;
+        @Schema(example = "[2014, 2, 7]")
+        public LocalDate closeDate;
+        @Schema(example = "savingsProduct.active")
+        public String status;
         public GetFixedDepositProductsProductIdCurrency currency;
         public GetFixedDepositProductsProductIdInterestCompoundingPeriodType interestCompoundingPeriodType;
         public GetFixedDepositProductsResponse.GetFixedDepositProductsInterestPostingPeriodType interestPostingPeriodType;

@@ -29,8 +29,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.transaction.annotation.Transactional;
 
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class FundReadPlatformServiceImpl implements FundReadPlatformService {
 
     private final JdbcTemplate jdbcTemplate;
@@ -38,7 +40,7 @@ public class FundReadPlatformServiceImpl implements FundReadPlatformService {
 
     private static final class FundMapper implements RowMapper<FundData> {
 
-        public String schema() {
+        private String schema() {
             return " f.id as id, f.name as name, f.external_id as externalId from m_fund f ";
         }
 

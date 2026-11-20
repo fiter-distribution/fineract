@@ -18,52 +18,23 @@
  */
 package org.apache.fineract.cob.service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
 import lombok.RequiredArgsConstructor;
 import org.apache.fineract.cob.COBConstant;
-import org.apache.fineract.cob.converter.COBParameterConverter;
-import org.apache.fineract.cob.data.COBParameter;
-import org.apache.fineract.cob.domain.AccountLock;
 import org.apache.fineract.cob.domain.LockOwner;
 import org.apache.fineract.cob.domain.LockingService;
-import org.apache.fineract.cob.resolver.CatchUpFlagResolver;
-import org.springframework.batch.core.StepExecution;
-import org.springframework.batch.item.ExecutionContext;
-import org.springframework.lang.NonNull;
+import org.jspecify.annotations.NonNull;
+import org.springframework.batch.core.step.StepExecution;
 
 @RequiredArgsConstructor
-public class BeforeStepLockingItemReaderHelper<T extends AccountLock> {
+public class BeforeStepLockingItemReaderHelper {
 
     private final RetrieveIdService retrieveIdService;
-    private final LockingService<T> loanLockingService;
+    private final LockingService loanLockingService;
 
-    @SuppressWarnings({ "unchecked" })
     public LinkedBlockingQueue<Long> filterRemainingData(@NonNull StepExecution stepExecution) {
-        ExecutionContext executionContext = stepExecution.getExecutionContext();
-        COBParameter loanCOBParameter = COBParameterConverter.convert(executionContext.get(COBConstant.COB_PARAMETER));
-        List<Long> loanIds;
-        boolean isCatchUp = CatchUpFlagResolver.resolve(stepExecution);
-        if (Objects.isNull(loanCOBParameter)
-                || (Objects.isNull(loanCOBParameter.getMinAccountId()) && Objects.isNull(loanCOBParameter.getMaxAccountId()))
-                || (loanCOBParameter.getMinAccountId().equals(0L) && loanCOBParameter.getMaxAccountId().equals(0L))) {
-            loanIds = Collections.emptyList();
-        } else {
-            loanIds = retrieveIdService.retrieveAllNonClosedLoansByLastClosedBusinessDateAndMinAndMaxLoanId(loanCOBParameter, isCatchUp);
-            if (!loanIds.isEmpty()) {
-                List<Long> lockedByCOBChunkProcessingAccountIds = getLoanIdsLockedWithChunkProcessingLock(loanIds);
-                loanIds.retainAll(lockedByCOBChunkProcessingAccountIds);
-            }
-        }
-        return new LinkedBlockingQueue<>(loanIds);
-    }
-
-    private List<Long> getLoanIdsLockedWithChunkProcessingLock(List<Long> loanIds) {
-        List<T> accountLocks = new ArrayList<>(
-                loanLockingService.findAllByLoanIdInAndLockOwner(loanIds, LockOwner.LOAN_COB_CHUNK_PROCESSING));
-        return accountLocks.stream().map(T::getId).toList();
+        return RemainingDataFilter.filterRemainingData(stepExecution, COBConstant.COB_PARAMETER,
+                retrieveIdService::retrieveAllNonClosedLoansByLastClosedBusinessDateAndMinAndMaxLoanId,
+                loanIds -> loanLockingService.findLockIdsByLoanIdInAndLockOwner(loanIds, LockOwner.LOAN_COB_CHUNK_PROCESSING));
     }
 }
